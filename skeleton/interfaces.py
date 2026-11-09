@@ -14,12 +14,19 @@ Run:
 from __future__ import annotations
 import argparse
 import datetime
+import hashlib
+import hmac
 import json
 import pathlib
-import sqlite3
+import secrets
 import uuid
 from dataclasses import dataclass, asdict
 from typing import List, Dict, Any, Optional
+
+try:  # imported as a package (tests, api/) or run as a script from skeleton/
+    from skeleton.db import Database
+except ImportError:  # pragma: no cover
+    from db import Database
 
 BASE_DIR = pathlib.Path(__file__).resolve().parent
 SCHEMA_PATH = BASE_DIR / "schema.sql"
@@ -29,6 +36,24 @@ HTML_DEMO_PATH = BASE_DIR / "zine_demo_view.html"
 
 def utc_now() -> str:
     return datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0).isoformat()
+
+
+def utc_now_precise() -> str:
+    """Microsecond timestamps so messages written in the same second still sort in order."""
+    return datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="microseconds")
+
+
+MEMORY_CATEGORIES = ("interest", "project", "routine", "observation")
+# Claim codes avoid look-alike characters (0/O, 1/I/L) so they survive being printed small.
+CLAIM_CODE_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"
+
+
+def normalize_claim_code(code: str) -> str:
+    return "".join(ch for ch in (code or "").upper() if ch.isalnum())
+
+
+def hash_claim_code(companion_id: str, code: str) -> str:
+    return hashlib.sha256(f"{companion_id}:{normalize_claim_code(code)}".encode("utf-8")).hexdigest()
 
 
 @dataclass
@@ -44,9 +69,13 @@ class AnimalScryptKernel:
     """Minimal, model-agnostic state & permission kernel for Animal Scrypt / Madken."""
 
     def __init__(self, db_path: str = ":memory:") -> None:
-        self.conn = sqlite3.connect(db_path)
-        self.conn.row_factory = sqlite3.Row
-        self.conn.executescript(SCHEMA_PATH.read_text(encoding="utf-8"))
+        # db_path may be a SQLite file path, ":memory:", or a postgres:// URL (Supabase).
+        self.conn = Database(db_path)
+        self.conn.apply_schema(SCHEMA_PATH.read_text(encoding="utf-8"))
+
+    @property
+    def backend(self) -> str:
+        return self.conn.backend
 
     # --- 1. Companion Identity Manifest ---
     def register_companion(
@@ -317,6 +346,134 @@ class AnimalScryptKernel:
         )
         self.conn.commit()
         return dict(self.conn.execute("SELECT * FROM royalty_ledger WHERE id = ?", (tx_id,)).fetchone())
+
+    # --- 8. Tag Pairing & Ownership (QR / NFC URL + printed claim code) ---
+    def issue_claim_code(self, companion_id: str) -> str:
+        """Create (or replace, while unclaimed) the claim code for a creature's tag.
+        Returns the plaintext code once; only its hash is stored."""
+        self.get_companion(companion_id)
+        existing = self.conn.execute("SELECT * FROM tag_claims WHERE companion_id = ?", (companion_id,)).fetchone()
+        if existing and existing["claimed_by"]:
+            raise PermissionError("This creature is already claimed; its code can't be reissued.")
+        raw = "".join(secrets.choice(CLAIM_CODE_ALPHABET) for _ in range(12))
+        code = f"{raw[0:4]}-{raw[4:8]}-{raw[8:12]}"
+        code_hash = hash_claim_code(companion_id, code)
+        if existing:
+            self.conn.execute(
+                "UPDATE tag_claims SET claim_code_hash = ? WHERE companion_id = ?",
+                (code_hash, companion_id),
+            )
+        else:
+            self.conn.execute(
+                "INSERT INTO tag_claims (companion_id, claim_code_hash, created_at) VALUES (?, ?, ?)",
+                (companion_id, code_hash, utc_now()),
+            )
+        self.conn.commit()
+        return code
+
+    def pairing_record(self, companion_id: str) -> Optional[Dict[str, Any]]:
+        row = self.conn.execute(
+            "SELECT companion_id, claimed_by, claimed_at, created_at FROM tag_claims WHERE companion_id = ?",
+            (companion_id,),
+        ).fetchone()
+        return dict(row) if row else None
+
+    def claim_companion(self, companion_id: str, user_id: str, code: str) -> Dict[str, Any]:
+        """Bind a creature to the signed-in human who holds its printed claim code."""
+        if not user_id:
+            raise PermissionError("Sign in before claiming a creature.")
+        self.get_companion(companion_id)
+        row = self.conn.execute("SELECT * FROM tag_claims WHERE companion_id = ?", (companion_id,)).fetchone()
+        if not row:
+            raise PermissionError("This creature has no tag yet.")
+        if row["claimed_by"]:
+            if row["claimed_by"] == user_id:
+                return self.get_companion(companion_id)
+            raise PermissionError("This creature already belongs to someone.")
+        if not hmac.compare_digest(row["claim_code_hash"], hash_claim_code(companion_id, code)):
+            raise PermissionError("That claim code doesn't match this creature.")
+        now = utc_now()
+        # Guarded update so two people racing the same code can't both win.
+        cur = self.conn.execute(
+            "UPDATE tag_claims SET claimed_by = ?, claimed_at = ? WHERE companion_id = ? AND claimed_by IS NULL",
+            (user_id, now, companion_id),
+        )
+        if cur.rowcount != 1:
+            self.conn.rollback()
+            raise PermissionError("This creature already belongs to someone.")
+        self.conn.execute("UPDATE companions SET owner_id = ? WHERE id = ?", (user_id, companion_id))
+        self.conn.commit()
+        return self.get_companion(companion_id)
+
+    def is_owner(self, companion_id: str, user_id: Optional[str]) -> bool:
+        if not user_id:
+            return False
+        row = self.conn.execute(
+            """
+            SELECT c.owner_id, t.claimed_by FROM companions c
+            JOIN tag_claims t ON t.companion_id = c.id
+            WHERE c.id = ?
+            """,
+            (companion_id,),
+        ).fetchone()
+        return bool(row and row["claimed_by"] == user_id and row["owner_id"] == user_id)
+
+    def list_companions_for_owner(self, user_id: str) -> List[Dict[str, Any]]:
+        rows = self.conn.execute(
+            """
+            SELECT c.id, c.name, t.claimed_at FROM companions c
+            JOIN tag_claims t ON t.companion_id = c.id
+            WHERE t.claimed_by = ? AND c.owner_id = ?
+            ORDER BY t.claimed_at
+            """,
+            (user_id, user_id),
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+    # --- 9. Memory reads used by the chat loop ---
+    def get_memory(self, memory_id: str) -> Optional[Dict[str, Any]]:
+        row = self.conn.execute("SELECT * FROM memory_records WHERE id = ?", (memory_id,)).fetchone()
+        return dict(row) if row else None
+
+    def list_memories(self, companion_id: str, status: str) -> List[Dict[str, Any]]:
+        rows = self.conn.execute(
+            "SELECT * FROM memory_records WHERE companion_id = ? AND status = ? ORDER BY created_at",
+            (companion_id, status),
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+    # --- 10. Conversation log ---
+    def log_message(self, companion_id: str, owner_id: str, role: str, content: str) -> Dict[str, Any]:
+        if role not in ("human", "creature"):
+            raise ValueError("role must be 'human' or 'creature'")
+        msg_id = f"msg-{uuid.uuid4().hex[:12]}"
+        self.conn.execute(
+            "INSERT INTO messages (id, companion_id, owner_id, role, content, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+            (msg_id, companion_id, owner_id, role, content, utc_now_precise()),
+        )
+        self.conn.commit()
+        return dict(self.conn.execute("SELECT * FROM messages WHERE id = ?", (msg_id,)).fetchone())
+
+    def recent_messages(
+        self, companion_id: str, owner_id: str, limit: int = 50, since: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
+        sql = "SELECT * FROM messages WHERE companion_id = ? AND owner_id = ?"
+        params: List[Any] = [companion_id, owner_id]
+        if since:
+            sql += " AND created_at >= ?"
+            params.append(since)
+        sql += " ORDER BY created_at DESC LIMIT ?"
+        params.append(int(limit))
+        rows = [dict(r) for r in self.conn.execute(sql, params).fetchall()]
+        rows.reverse()
+        return rows
+
+    def clear_messages(self, companion_id: str, owner_id: str) -> int:
+        cur = self.conn.execute(
+            "DELETE FROM messages WHERE companion_id = ? AND owner_id = ?", (companion_id, owner_id)
+        )
+        self.conn.commit()
+        return cur.rowcount
 
 
 def render_zine_html(bundle_a: Dict[str, Any], ritual: Dict[str, Any]) -> str:

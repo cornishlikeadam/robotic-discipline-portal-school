@@ -1,0 +1,23 @@
+{
+  "_note": "Founding creatures for tag minting. Lore comes from the School's companion copy in app.js. Edit freely; ids become the tag URL (/c/<id>).",
+  "creatures": [
+    {
+      "id": "mk-patch-001",
+      "name": "PATCH",
+      "authored_lore": "A robotic rabbit with one folded ear and a habit of asking what happens next. PATCH is the curious maker: hands-on, a little restless, and happiest one prototype ahead.",
+      "chassis": {"translucent_tint": "cobalt-blue-08", "optic_accent": "phosphor-amber-green", "progression_stage": 1}
+    },
+    {
+      "id": "mk-moss-001",
+      "name": "MOSS",
+      "authored_lore": "A modular tortoise who takes time to notice the structure underneath. MOSS is the steady observer: patient, precise, and good at looking closely before deciding.",
+      "chassis": {"translucent_tint": "moss-green-04", "optic_accent": "soft-amber", "progression_stage": 1}
+    },
+    {
+      "id": "mk-pip-001",
+      "name": "PIP",
+      "authored_lore": "A little bird with room for another point of view. PIP is the bright collaborator: quick, warm, and always asking who else should be in the room.",
+      "chassis": {"translucent_tint": "signal-yellow-02", "optic_accent": "cool-white", "progression_stage": 1}
+    }
+  ]
+}

@@ -6,3 +6,6 @@ __pycache__/
 .env
 .env.*
 .vercel
+
+# Creature tag output (contains claim codes; never commit)
+tag-output/

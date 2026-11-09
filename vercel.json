@@ -6,6 +6,10 @@
       "destination": "/index.html"
     },
     {
+      "source": "/c/(.*)",
+      "destination": "/api/index.py"
+    },
+    {
       "source": "/(studio|blueprint|seed|portfolio|workspace|dataroom|directory|zine)",
       "destination": "/api/index.py"
     },
