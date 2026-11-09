@@ -119,7 +119,7 @@ def route_request(
         return 200, with_cors({"Content-Type": "application/javascript; charset=utf-8"}), APP_JS_PATH.read_text(encoding="utf-8")
     if method == "GET" and clean_path == "/seed-bundle.json":
         return 200, with_cors({"Content-Type": "application/json; charset=utf-8"}), SEED_BUNDLE_PATH.read_text(encoding="utf-8")
-    if method == "GET" and clean_path == "/gamified":
+    if method == "GET" and clean_path in ("/", "/index.html", "/gamified"):
         return 200, with_cors({"Content-Type": "text/html; charset=utf-8"}), INDEX_HTML_PATH.read_text(encoding="utf-8")
 
     # Portal Machine Lead Capture API (backs github.io and Vercel)

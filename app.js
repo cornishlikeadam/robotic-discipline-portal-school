@@ -449,7 +449,7 @@ function blueprintView() {
   return `
     <div class="page-intro">
       <h1>WHITE PAPER, CAD BLUEPRINT &amp;<br><span style="color:var(--accent)">VISUAL STUDIO.</span></h1>
-      <p>Read the entire Robotic Discipline × Animal Scrypt × Portal Machine Story Maps White Paper and `/seed/00-29` operating book as a formatted publication, customize the hardware shell &amp; colors live, and click any text to edit it visually on the page.</p>
+      <p>Read the entire Robotic Discipline × Animal Scrypt × Portal Machine Story Maps White Paper and <code>/seed/00-29</code> operating book as a formatted publication, customize the hardware shell &amp; colors live, and click any text to edit it visually on the page.</p>
     </div>
 
     <!-- Interactive Hardware & Shell Blueprint Schematic -->

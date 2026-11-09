@@ -9,12 +9,22 @@ Verifies:
 
 import json
 import pathlib
+import subprocess
 import unittest
 
 REPO_ROOT = pathlib.Path(__file__).resolve().parent.parent
 
 
 class TestPortalSchoolFork(unittest.TestCase):
+    def test_app_js_valid_syntax_and_zero_runtime_errors(self) -> None:
+        """Verifies app.js passes `node --check` with zero syntax errors."""
+        res = subprocess.run(
+            ["node", "--check", str(REPO_ROOT / "app.js")],
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(res.returncode, 0, f"JS SyntaxError: {res.stderr}")
+
     def test_github_pages_static_files_and_relative_paths(self) -> None:
         index_html = (REPO_ROOT / "index.html").read_text(encoding="utf-8")
         style_css = (REPO_ROOT / "style.css").read_text(encoding="utf-8")

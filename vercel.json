@@ -2,19 +2,15 @@
   "version": 2,
   "rewrites": [
     {
-      "source": "/assets/(.*)",
-      "destination": "/assets/$1"
-    },
-    {
-      "source": "/(style\\.css|app\\.js|seed-bundle\\.json)",
-      "destination": "/$1"
-    },
-    {
-      "source": "/",
+      "source": "/gamified",
       "destination": "/index.html"
     },
     {
-      "source": "/(.*)",
+      "source": "/(studio|blueprint|seed|portfolio|workspace|dataroom|directory|zine)",
+      "destination": "/api/index.py"
+    },
+    {
+      "source": "/api/(.*)",
       "destination": "/api/index.py"
     }
   ]
