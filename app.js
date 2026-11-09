@@ -11,6 +11,62 @@ const art = [
   'assets/03-build-side-by-side.png'
 ];
 
+// --- 0. THREE COMPANY IDENTITIES INFRASTRUCTURE THESIS (SAVED PREVIOUS STATE) ---
+const threeIdentitiesThesis = {
+  roboticDiscipline: {
+    title: 'Robotic Discipline (Animal Scrypt × Disciple × Madken): Three Company Identities',
+    winner: 'Identity 3 — Vertically Integrated Physical-Digital Companion & Memory Infrastructure',
+    summary:
+      'We see three possible identities for Robotic Discipline: (1) a consumer collectible studio, (2) a B2B AI agent & educational software tool, or (3) a vertically integrated physical-digital companion and memory infrastructure company. The third has the largest long-term potential because we are not simply selling plastic shells or wrapping chat prompts—we are building the hardware identity layer (NTAG215 NFC/QR physical binding), the human-approved memory ledger (PROPOSED -> APPROVED -> DELETED), and the 20% single-hop royalty rail governing how persistent artificial animals live across homes, schools, and creators.',
+    identities: [
+      {
+        tier: 'Identity 1',
+        name: 'Consumer Collectible Studio',
+        scope: 'Sells 3D-printed figures and character art drops.',
+        limitation: 'Transactional one-off merch without durable recurring memory or protocol lock-in.'
+      },
+      {
+        tier: 'Identity 2',
+        name: 'B2B AI Agent & Classroom Software',
+        scope: 'Provides browser-based learning exercises and prompt workflows.',
+        limitation: 'Pure software SaaS is easily commoditized without a physical anchor in the room.'
+      },
+      {
+        tier: 'Identity 3 (Chosen Core)',
+        name: 'Vertically Integrated Companion & Memory Infrastructure',
+        scope: 'Owns the physical shell specification, cryptographic NFC/QR pairing, consent-first 7-day memory ledger, and 20% creator royalty settlement.',
+        limitation: 'Highest long-term moat: governs how physical objects and persistent AI minds bind together.'
+      }
+    ]
+  },
+  foodRecovery: {
+    title: 'Surplus Food Systems (Kindred’s Waitlist / Constant Gardener Track): Three Company Identities',
+    winner: 'Identity 3 — Vertically Integrated Food Recovery Infrastructure',
+    summary:
+      'I see three possible identities for the company: a consumer food marketplace, a B2B inventory intelligence company, or a vertically integrated food recovery infrastructure company. The third has the biggest long-term potential, because you are not simply facilitating food transactions. You are developing the intelligence and physical infrastructure governing what happens to surplus food before it becomes waste.',
+    identities: [
+      {
+        tier: 'Identity 1',
+        name: 'Consumer Food Marketplace',
+        scope: 'Connects shoppers with discounted surplus meals or grocers.',
+        limitation: 'Facilitates end-of-line transactions after surplus has already accumulated.'
+      },
+      {
+        tier: 'Identity 2',
+        name: 'B2B Inventory Intelligence',
+        scope: 'Forecasting dashboards for kitchens, farms, and grocers.',
+        limitation: 'Advisory software alone cannot move or repurpose physical perishable inventory.'
+      },
+      {
+        tier: 'Identity 3 (Chosen Core)',
+        name: 'Vertically Integrated Food Recovery Infrastructure',
+        scope: 'Combines predictive surplus intelligence with physical cold-chain routing, local redistribution hubs, and automated recovery before food becomes waste.',
+        limitation: 'Governs the full physical + digital lifecycle of surplus nutrition.'
+      }
+    ]
+  }
+};
+
 // --- 1. PORTAL MACHINE STORY MAPS CONFIG (6 Living Apps + 5 Stops per World) ---
 const defaultPortalConfig = {
   title: 'Portal Machine Story Maps',
@@ -21,7 +77,7 @@ const defaultPortalConfig = {
       name: "Kindred's Waitlist",
       glyph: 'KW',
       color: '#ffd400',
-      tagline: 'Flagship 5-stop kinetic causeway world driving early cohort & waitlist signups.',
+      tagline: 'Flagship 5-stop kinetic causeway world driving early cohort, food recovery & companion waitlist signups.',
       stops: [
         {
           step: 1,
@@ -40,7 +96,7 @@ const defaultPortalConfig = {
         {
           step: 3,
           label: 'Company Lab',
-          pitch: 'Inspect the Robotic Discipline × Animal Scrypt × Madken engineering hands-on lab.',
+          pitch: 'Inspect the Three Company Identities thesis & vertically integrated infrastructure.',
           cta: 'Explore the systems being built',
           link: '#lab'
         },
@@ -93,7 +149,7 @@ const defaultPortalConfig = {
       name: 'Company Lab',
       glyph: 'CL',
       color: '#fe5400',
-      tagline: 'Robotic Discipline (Animal Scrypt × Disciple × Madken) operating engine.',
+      tagline: 'Robotic Discipline (Animal Scrypt × Disciple × Madken) vertically integrated operating engine.',
       stops: [
         { step: 1, label: 'Company Lab', pitch: 'One company: Animal Scrypt product, Disciple studio, Madken mark.', cta: 'Read Master Context', link: '#blueprint' },
         { step: 2, label: '4-Tier Price Ladder', pitch: '$45 + $9/mo V1 shell scaling to $2,500 Founding Cohort.', cta: 'Inspect Pricing & CFO', link: '#dataroom' },
@@ -143,7 +199,6 @@ let portalConfig = (() => {
 })();
 
 let activeAppId = 'kindreds-waitlist';
-let machineStarted = true;
 let activeStopIndex = 0;
 let visitedStops = new Set(['kindreds-waitlist:0']);
 let visitedZones = new Set(['make']);
@@ -182,10 +237,10 @@ let notes = readNotes();
 let storageError = '';
 
 function updateQuestHud() {
-  const b1 = visitedStops.size >= 3; // Portal Engineer
-  const b2 = visitedZones.size >= 3; // Campus Explorer
+  const b1 = visitedStops.size >= 3; // Portal Gear
+  const b2 = visitedZones.size >= 3; // Map Explorer
   const b3 = notes.length >= 1;      // Memory Steward
-  const b4 = !!seedBundle;           // Blueprint Architect
+  const b4 = !!seedBundle;           // Blueprint Reader
   const badges = [
     ['Portal Gear', b1],
     ['Map Explorer', b2],
@@ -299,7 +354,7 @@ function persist() {
   }
 }
 
-// --- 4. VIEW: PORTAL MACHINE STORY MAPS (#portal) ---
+// --- 4. VIEW: PORTAL MACHINE STORY MAPS (#portal) + THREE IDENTITIES THESIS ---
 function portalView() {
   const appObj = portalConfig.apps.find(a => a.id === activeAppId) || portalConfig.apps[0];
   const currentStop = appObj.stops[activeStopIndex] || appObj.stops[0];
@@ -327,12 +382,15 @@ function portalView() {
     .join('');
 
   const gearAngle = activeStopIndex * 72;
-  const progressPct = ((activeStopIndex + 1) / appObj.stops.length) * 100;
 
   return `
     <div class="page-intro">
       <h1>PORTAL MACHINE<br><span style="color:var(--accent)">STORY MAPS.</span></h1>
-      <p>A stationary home screen where every icon opens a living causeway world. Trigger the chain reaction, pause at each stop, and convert curiosity into action.</p>
+      <p>A stationary home screen where every icon opens a living causeway world. Trigger the chain reaction, pause at each stop, or jump into the reengineered Pizza Ninjas × Spellverse World Map.</p>
+      <div class="actions" style="margin-top:16px">
+        <a href="#map" class="button">🌍 Launch Full World Map (Pizza Ninjas × Spellverse) ↗</a>
+        <a href="#blueprint" class="button secondary" data-open-doc="PORTAL_MACHINE_BLUEPRINT">Read 12-Section Blueprint ↗</a>
+      </div>
     </div>
 
     <!-- LAYER 1: STATIONARY HOME SCREEN OF LIVING APPS -->
@@ -342,7 +400,7 @@ function portalView() {
           <span style="font-size:11px;letter-spacing:1.4px;color:var(--accent)">LAYER 1 // STATIONARY APP HOME SCREEN</span>
           <h2 style="font-size:30px;margin-top:4px">Select a Living App to Launch Its World</h2>
         </div>
-        <a href="#blueprint" class="button secondary" data-open-doc="PORTAL_MACHINE_BLUEPRINT">Read 12-Section Blueprint ↗</a>
+        <a href="#map" class="button orange">Teleport to World Map ↗</a>
       </div>
       <div class="app-icon-grid">${appIconsHtml}</div>
     </section>
@@ -360,7 +418,6 @@ function portalView() {
       <!-- Animated SVG Domino / Gear Causeway Illustration -->
       <div style="margin:18px 0;background:#0c0d12;border:1px solid #2e323d;border-radius:12px;padding:14px">
         <svg viewBox="0 0 900 130" style="width:100%;height:auto;display:block" aria-label="Animated cause-and-effect domino gear path">
-          <!-- Signal Causeway Pipe -->
           <line x1="70" y1="65" x2="830" y2="65" stroke="#292d38" stroke-width="10" stroke-linecap="round"/>
           <line x1="70" y1="65" x2="${70 + (760 * activeStopIndex) / 4}" y2="65" stroke="${esc(appObj.color)}" stroke-width="10" stroke-linecap="round"/>
           ${appObj.stops
@@ -427,6 +484,32 @@ function portalView() {
             )}</textarea>
             <button type="button" class="button secondary" id="save-portal-json" style="margin-top:8px">Save World Config</button>
           </details>
+        </div>
+      </div>
+    </section>
+
+    <!-- LAYER 3: THREE COMPANY IDENTITIES INFRASTRUCTURE THESIS (SAVED STATE) -->
+    <section class="causeway-machine" style="margin-top:24px" aria-label="Three Company Identities Strategic Architecture">
+      <span style="font-size:11px;letter-spacing:1.4px;color:var(--lime)">STRATEGIC ARCHITECTURE // THREE COMPANY IDENTITIES THESIS</span>
+      <h2 style="font-size:32px;margin-top:4px">Why Vertically Integrated Infrastructure Wins</h2>
+      <div class="workbench" style="margin-top:14px">
+        <div class="panel" style="border-left:4px solid var(--accent)">
+          <h3 style="font-size:22px;color:var(--accent)">1. ${esc(threeIdentitiesThesis.roboticDiscipline.title)}</h3>
+          <p style="font-size:14px;color:#e5e0d6">${esc(threeIdentitiesThesis.roboticDiscipline.summary)}</p>
+          <ul style="font-size:13px;color:#c3beb5;padding-left:18px;margin-top:10px">
+            ${threeIdentitiesThesis.roboticDiscipline.identities
+              .map(i => `<li style="margin-bottom:6px"><strong>${esc(i.tier)} — ${esc(i.name)}:</strong> ${esc(i.scope)} <em>(${esc(i.limitation)})</em></li>`)
+              .join('')}
+          </ul>
+        </div>
+        <div class="panel" style="border-left:4px solid var(--lime)">
+          <h3 style="font-size:22px;color:var(--lime)">2. ${esc(threeIdentitiesThesis.foodRecovery.title)}</h3>
+          <p style="font-size:14px;color:#e5e0d6">${esc(threeIdentitiesThesis.foodRecovery.summary)}</p>
+          <ul style="font-size:13px;color:#c3beb5;padding-left:18px;margin-top:10px">
+            ${threeIdentitiesThesis.foodRecovery.identities
+              .map(i => `<li style="margin-bottom:6px"><strong>${esc(i.tier)} — ${esc(i.name)}:</strong> ${esc(i.scope)} <em>(${esc(i.limitation)})</em></li>`)
+              .join('')}
+          </ul>
         </div>
       </div>
     </section>
@@ -605,7 +688,7 @@ function directoryView() {
   `;
 }
 
-// --- 8. ORIGINAL SCHOOL VIEWS (#school, #lab, #companions, #studio, #notebook, #about, #map) ---
+// --- 8. ORIGINAL SCHOOL VIEWS (#school, #lab, #companions, #studio, #notebook, #about) ---
 function lessonMarkup(l) {
   return `<article class="lesson"><img src="${art[l.image]}" alt="${['PATCH, MOSS and PIP at a making workbench', 'PATCH presenting a note with Approve, Edit and Discard choices', 'Three companions making at a shared workbench'][l.image]}" loading="lazy" width="1122" height="1402"><div class="lesson-top"><span>${l.category.toUpperCase()}</span><span>${l.time} / SELF-GUIDED</span></div><h3>${l.title}</h3><p>${l.description}</p><button type="button" data-lesson="${l.id}">Try this exercise ↗</button></article>`;
 }
@@ -631,78 +714,1029 @@ function notebook() {
 }
 
 function about() {
-  return `<div class="page-intro"><h1>CURIOUS PEOPLE.<br>USEFUL MACHINES.</h1><p>Robotic Discipline School &amp; Portal Machine Story Maps are part of Robotic Discipline (Animal Scrypt × Disciple × Madken), founded by Kendren “KJ” Cornish.</p></div><div class="about-copy"><h2>Unified Architecture.</h2><p>This forked edition combines the Portal Machine Story Maps cause-and-effect funnel engine, the interactive Robotic Discipline School campus map and exercises, and the complete White Paper &amp; Blueprint visual studio.</p><a href="#portal" class="button">Back to Portal Machine ↗</a></div>`;
+  return `<div class="page-intro"><h1>CURIOUS PEOPLE.<br>USEFUL MACHINES.</h1><p>Robotic Discipline School &amp; Portal Machine Story Maps are part of Robotic Discipline (Animal Scrypt × Disciple × Madken), founded by Kendren “KJ” Cornish.</p></div><div class="about-copy"><h2>Unified Architecture.</h2><p>This forked edition combines the reengineered Pizza Ninjas IP School × Taproot Wizards Spellverse interactive world map, the Portal Machine Story Maps cause-and-effect funnel engine, the Three Company Identities thesis, and the complete White Paper &amp; Blueprint visual studio.</p><div class="actions" style="margin-top:16px"><a href="#map" class="button">Explore World Map ↗</a><a href="#portal" class="button orange">Open Portal Machine ↗</a></div></div>`;
 }
 
+// ============================================================================
+// 9. REENGINEERED WORLD MAP: PIZZA NINJAS IP SCHOOL × SPELLVERSE × PREVIOUS STATE
+// ============================================================================
 const mapZones = [
-  { id: 'make', name: 'Making Workshop', short: 'MAKE', x: 20, y: 40, companion: 'PATCH / Curious maker', text: 'Start at the workbench. Turn a sheet of paper into a character, then notice what helps it stand.', action: 'Try the paper-machine exercise', lesson: 'paper' },
-  { id: 'memory', name: 'Memory Archive', short: 'REMEMBER', x: 50, y: 36, companion: 'PATCH / Your say comes first', text: 'Design one useful project memory. Decide what to approve, edit, or discard before keeping a note in your browser.', action: 'Explore memory boundaries', lesson: 'memory' },
-  { id: 'lab', name: 'Reengineering Lab', short: 'REENGINEER', x: 82, y: 40, companion: 'MOSS / Look a little closer', text: 'Choose an unpowered everyday object. Map its parts, question one design decision, and sketch a clearer second version.', action: 'Enter the Reengineering Lab', lesson: 'reverse' },
-  { id: 'garden', name: 'Quiet Garden', short: 'REST', x: 17, y: 89, companion: 'MOSS / The steady observer', text: 'Take a pause. Look away from your screen, notice one thing around you, and return when you want. No countdown, streak, or score.', action: 'Meet MOSS and the companions', route: 'companions' },
-  { id: 'yard', name: 'Co-making Yard', short: 'TOGETHER', x: 49, y: 92, companion: 'PIP / Another point of view', text: 'Try a quiet making session with someone you choose. This is a self-guided activity; the map does not show live visitors or connect people automatically.', action: 'Try a side-by-side session', lesson: 'together' },
-  { id: 'studio', name: 'Concept Studio', short: 'IMAGINE', x: 82, y: 89, companion: 'PIP / The bright collaborator', text: 'Turn your idea into a reusable image prompt with the School palette, original companions, and a clear headline.', action: 'Build a concept prompt', route: 'studio' }
+  {
+    id: 'make',
+    kind: 'zone',
+    name: 'Making Workshop',
+    short: 'MAKE',
+    x: 20,
+    y: 40,
+    companion: 'PATCH / Curious maker',
+    text: 'Start at the workbench. Turn a sheet of paper into a character, then notice what helps it stand.',
+    infraNote: 'Identity 3 Layer: Physical 3D-printed shell prototyping + NTAG215 base slot.',
+    action: 'Try the paper-machine exercise',
+    lesson: 'paper',
+    starters: ['What fold gives a paper character the widest stance?', 'How does WAVE-08 fit the 28mm NTAG215 tag?']
+  },
+  {
+    id: 'memory',
+    kind: 'zone',
+    name: 'Memory Archive',
+    short: 'REMEMBER',
+    x: 50,
+    y: 34,
+    companion: 'PATCH / Your say comes first',
+    text: 'Design one useful project memory. Decide what to approve, edit, or discard before keeping a note in your browser.',
+    infraNote: 'Identity 3 Layer: Human-in-the-loop PROPOSED -> APPROVED -> DELETED 7-day memory ledger.',
+    action: 'Explore memory boundaries',
+    lesson: 'memory',
+    starters: ['What is one boundary every AI companion should respect?', 'Why require explicit human approval for 7-day recall?']
+  },
+  {
+    id: 'lab',
+    kind: 'zone',
+    name: 'Reengineering Lab',
+    short: 'REENGINEER',
+    x: 82,
+    y: 40,
+    companion: 'MOSS / Look a little closer',
+    text: 'Choose an unpowered everyday object. Map its parts, question one design decision, and sketch a clearer second version.',
+    infraNote: 'Identity 3 Layer: Reverse-engineering physical mechanisms and vertically integrated infrastructure.',
+    action: 'Enter the Reengineering Lab',
+    lesson: 'reverse',
+    starters: ['Which everyday object on your desk has the best hinge?', 'How do we govern surplus food before it becomes waste?']
+  },
+  {
+    id: 'garden',
+    kind: 'zone',
+    name: 'Quiet Garden',
+    short: 'REST',
+    x: 17,
+    y: 86,
+    companion: 'MOSS / The steady observer',
+    text: 'Take a pause. Look away from your screen, notice one thing around you, and return when you want. No countdown, streak, or score.',
+    infraNote: 'Identity 3 Layer: Zero-shame dormancy & Constant Gardener food recovery rhythms.',
+    action: 'Meet MOSS and the companions',
+    route: 'companions',
+    starters: ['Why does zero-shame dormancy beat daily streak pressure?', 'How can Savannah urban gardens link to Kindred’s Waitlist?']
+  },
+  {
+    id: 'yard',
+    kind: 'zone',
+    name: 'Co-making Yard',
+    short: 'TOGETHER',
+    x: 49,
+    y: 89,
+    companion: 'PIP / Another point of view',
+    text: 'Try a quiet making session with someone you choose. Shared attention without a performative feed.',
+    infraNote: 'Identity 3 Layer: Bilateral memory fragments requiring two-party consent.',
+    action: 'Try a side-by-side session',
+    lesson: 'together',
+    starters: ['What changes when two people build quietly for 15 minutes?', 'How does bilateral memory consent work?']
+  },
+  {
+    id: 'studio',
+    kind: 'zone',
+    name: 'Concept Studio',
+    short: 'IMAGINE',
+    x: 82,
+    y: 86,
+    companion: 'PIP / The bright collaborator',
+    text: 'Turn your idea into a reusable image prompt with the School palette, original companions, and a clear headline.',
+    infraNote: 'Identity 3 Layer: 20% single-hop parent creator royalty rail in SQLite.',
+    action: 'Build a concept prompt',
+    route: 'studio',
+    starters: ['Share your favorite headline in the School visual language!', 'How does the 20% single-hop royalty reward parent creators?']
+  }
 ];
 
+// Spellverse Portal Gateways on the Map (linking directly to the 6 Portal Machine Living Worlds)
+const mapPortals = [
+  {
+    id: 'portal-kindreds-waitlist',
+    kind: 'portal',
+    portalAppId: 'kindreds-waitlist',
+    name: "Portal: Kindred's Waitlist",
+    short: 'PORTAL 01',
+    x: 34,
+    y: 22,
+    companion: 'SPELLVERSE GATEWAY // FOOD & COMPANION INFRASTRUCTURE',
+    text: 'Flagship 5-stop kinetic causeway world. Develops the intelligence and physical infrastructure governing surplus food before it becomes waste + early SCAD companion cohort.',
+    infraNote: 'Three Identities Winner: Vertically Integrated Food Recovery & Companion Infrastructure.',
+    action: "Launch Kindred's Waitlist Causeway",
+    starters: ['Why is vertically integrated food recovery bigger than a consumer marketplace?', 'Who is joining the Savannah / SCAD founding cohort?']
+  },
+  {
+    id: 'portal-company',
+    kind: 'portal',
+    portalAppId: 'company',
+    name: 'Portal: Company Lab & Royalty Rail',
+    short: 'PORTAL 02',
+    x: 67,
+    y: 22,
+    companion: 'SPELLVERSE GATEWAY // ANIMAL SCRYPT × MADKEN',
+    text: 'Inspect the 4-tier price ladder ($45 V1 shell to $2,500 Founding Cohort), the 20% single-hop creator royalty ledger, and the Stage 1/2 Investor Data Room.',
+    infraNote: 'Three Identities Winner: Vertically Integrated Physical-Digital Companion Infrastructure.',
+    action: 'Open Company Lab Causeway',
+    starters: ['How does the $45 + $9/mo V1 unit economics scale across 4 tiers?', 'Test the simulated creator-to-owner 20% royalty transfer!']
+  },
+  {
+    id: 'portal-research',
+    kind: 'portal',
+    portalAppId: 'research',
+    name: 'Portal: Research & White Paper',
+    short: 'PORTAL 03',
+    x: 34,
+    y: 64,
+    companion: 'SPELLVERSE GATEWAY // /SEED/00-29 & CAD BLUEPRINT',
+    text: 'Read and visually edit all 38 documents in the White Paper & Blueprint Studio, customize the WAVE-08 translucent shell, and browse 15 open-source VC tools.',
+    infraNote: 'Full /seed/00-29 operating book + 12-section Portal Machine Story Maps specification.',
+    action: 'Open White Paper & Blueprint Studio',
+    route: 'blueprint',
+    starters: ['Which chapter of /seed/00-29 is most useful for hardware founders?', 'Try changing the WAVE-08 shell tint in #blueprint!']
+  },
+  {
+    id: 'portal-social',
+    kind: 'portal',
+    portalAppId: 'dating-social',
+    name: 'Portal: Parallel Presence Social',
+    short: 'PORTAL 04',
+    x: 66,
+    y: 64,
+    companion: 'SPELLVERSE GATEWAY // CO-MAKING RITUALS',
+    text: 'Low-pressure parallel presence and shared ritual objects instead of swipe fatigue or streak anxiety.',
+    infraNote: 'Bilateral memory fragments + 15-minute quiet co-making blocks.',
+    action: 'Enter Social Portal Causeway',
+    starters: ['How do paired shells create parallel presence without screen fatigue?']
+  },
+  {
+    id: 'companion-plaza',
+    kind: 'companion',
+    name: 'Central Companion Plaza (PATCH, MOSS, PIP & WAVE-08)',
+    short: 'PLAZA',
+    x: 50,
+    y: 52,
+    companion: 'HEART OF CAPITAL CAMPUS // ALL COMPANIONS',
+    text: 'Meet PATCH the curious maker rabbit, MOSS the steady observer tortoise, PIP the bright collaborator bird, and the WAVE-08 translucent scout unit.',
+    infraNote: 'One physical 3D-printed shell + NTAG215 tag bound to one persistent AI personality.',
+    action: 'Meet the Companions',
+    route: 'companions',
+    starters: ['Are you team PATCH, team MOSS, or team PIP?', 'What personality trait should our next physical shell carry?']
+  }
+];
+
+// Default on-map Idea Dots (.msgdot) inspired by Pizza Ninjas IP School
+const defaultIdeaDots = [
+  {
+    id: 'idea-food-infra',
+    kind: 'idea',
+    name: 'Idea: Surplus Food Infrastructure before Waste',
+    short: 'IDEA DOT',
+    x: 27,
+    y: 53,
+    author: 'KJ Cornish',
+    companion: 'COMMUNITY IDEA PIN // THREE IDENTITIES THESIS',
+    text: 'Instead of just a consumer food marketplace or B2B inventory dashboard, build the vertically integrated intelligence + physical cold-chain routing governing surplus food before it becomes waste.',
+    infraNote: 'Pinned to Kindred’s Waitlist & Constant Gardener track.',
+    action: 'Open Portal Machine',
+    route: 'portal',
+    starters: ['How can campus dining halls and local grocers plug into this node?']
+  },
+  {
+    id: 'idea-nfc-shell',
+    kind: 'idea',
+    name: 'Idea: Translucent Cobalt Shell + 28mm NTAG215',
+    short: 'IDEA DOT',
+    x: 73,
+    y: 54,
+    author: 'SCAD Maker #04',
+    companion: 'COMMUNITY IDEA PIN // HARDWARE SHELL',
+    text: 'Snap-fit 2.4mm translucent PETG/resin shell with a bottom bayonet cap so anyone can inspect or swap the NTAG215 NFC tag without tools.',
+    infraNote: 'Pinned to CAD Blueprint Studio (#blueprint).',
+    action: 'Inspect CAD Schematic',
+    route: 'blueprint',
+    starters: ['Should we offer glow-in-the-dark filament for Cohort 1?']
+  }
+];
+
+let mapIdeaDots = (() => {
+  try {
+    const saved = JSON.parse(localStorage.getItem('rd-map-idea-dots') || 'null');
+    return Array.isArray(saved) && saved.length ? saved : defaultIdeaDots;
+  } catch {
+    return defaultIdeaDots;
+  }
+})();
+
+let spotChats = (() => {
+  try {
+    const saved = JSON.parse(localStorage.getItem('rd-map-spot-chats') || 'null');
+    if (saved && typeof saved === 'object') return saved;
+  } catch {}
+  return {
+    make: [
+      { author: 'KJ Cornish', time: '2h ago', text: 'Welcome to the Making Workshop! Start with one folded sheet of paper or inspect the WAVE-08 shell.' },
+      { author: 'Maya (SCAD ID)', time: '1h ago', text: 'Widening the base flange by 4mm kept our paper prototype standing through the whole critique.' }
+    ],
+    memory: [
+      { author: 'PATCH_OS', time: '3h ago', text: 'Memory Rule #1: Nothing enters the 7-day recall ledger until you click Approve.' }
+    ],
+    'portal-kindreds-waitlist': [
+      { author: 'KJ Cornish', time: '4h ago', text: 'Three possible identities: consumer marketplace, B2B inventory intelligence, or vertically integrated infrastructure. We are building #3.' }
+    ]
+  };
+})();
+
 let selectedZone = 'make';
+let placingIdeaMode = false;
+let activeMapModal = ''; // '', 'community', 'wiki', 'welcome'
+let wikiCategory = 'All';
+let wikiSearch = '';
+let teleportQueue = [];
+
+// Camera state for Pizza Ninjas full-stage pan/zoom + flyTo
 let mapView = { x: 0, y: 0, scale: 1, fit: 1 };
+let flyAnimFrame = 0;
+let birdAnimFrame = 0;
+let keyLoopFrame = 0;
+let heldKeys = { up: false, down: false, left: false, right: false, z: false, x: false };
 let mapResizeObserver;
 
+// Web Audio Synth Radio State (Pizza Ninjas #musichud)
+const radioTracks = [
+  { title: 'SCAD Fabrication Lo-Fi', artist: 'Robotic Discipline Radio', tempo: 92, notes: [261.63, 329.63, 392.0, 523.25, 440.0, 392.0, 329.63, 293.66] },
+  { title: 'Spellverse Leyline Arp', artist: 'Taproot × Animal Scrypt', tempo: 108, notes: [293.66, 369.99, 440.0, 587.33, 554.37, 440.0, 369.99, 329.63] },
+  { title: 'Capital Campus 8-Bit', artist: 'Pizza Ninjas IP Tribute', tempo: 118, notes: [329.63, 392.0, 493.88, 659.25, 587.33, 493.88, 392.0, 329.63] },
+  { title: 'Savannah Moss Drift', artist: 'MOSS & Constant Gardener', tempo: 78, notes: [220.0, 277.18, 329.63, 440.0, 392.0, 329.63, 277.18, 246.94] }
+];
+let radioIndex = 0;
+let radioPlaying = false;
+let radioLiked = false;
+let radioExpanded = false;
+let radioInterval = null;
+let audioCtx = null;
+let radioStep = 0;
+
+function toggleRadioPlay(forceState) {
+  const next = typeof forceState === 'boolean' ? forceState : !radioPlaying;
+  radioPlaying = next;
+  if (radioInterval) {
+    clearInterval(radioInterval);
+    radioInterval = null;
+  }
+  if (radioPlaying) {
+    try {
+      if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      if (audioCtx.state === 'suspended') audioCtx.resume();
+      const tr = radioTracks[radioIndex];
+      const stepMs = Math.round((60 / tr.tempo) * 500);
+      radioInterval = setInterval(() => {
+        if (!radioPlaying || !audioCtx) return;
+        const freq = tr.notes[radioStep % tr.notes.length];
+        radioStep += 1;
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+        gain.gain.setValueAtTime(0.035, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.0008, audioCtx.currentTime + stepMs / 1000);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start();
+        osc.stop(audioCtx.currentTime + stepMs / 1000);
+      }, stepMs);
+    } catch {
+      // AudioContext blocked or unsupported in headless test
+    }
+  }
+  updateRadioDom();
+}
+
+function updateRadioDom() {
+  const tr = radioTracks[radioIndex];
+  const titleEl = document.querySelector('#tracktitle');
+  const artistEl = document.querySelector('#trackartist');
+  const playBtn = document.querySelector('#playpausebtn');
+  const likeBtn = document.querySelector('#likebtn');
+  const extrasEl = document.querySelector('#radioextras');
+  if (titleEl) titleEl.textContent = tr.title;
+  if (artistEl) artistEl.textContent = tr.artist;
+  if (playBtn) playBtn.textContent = radioPlaying ? '⏸' : '▶';
+  if (likeBtn) {
+    likeBtn.classList.toggle('liked', radioLiked);
+    likeBtn.textContent = radioLiked ? '♥' : '♡';
+  }
+  if (extrasEl) extrasEl.classList.toggle('open', radioExpanded);
+}
+
+function getAllMapSpots() {
+  return [...mapZones, ...mapPortals, ...mapIdeaDots];
+}
+
+function getSpotById(id) {
+  return getAllMapSpots().find(s => s.id === id) || mapZones[0];
+}
+
 function zoneDetail(z) {
-  return `<div class="map-detail-heading"><span class="map-signal" aria-hidden="true"></span><h2>${z.name}</h2></div><p class="map-companion">${z.companion}</p><p>${z.text}</p><button class="button" id="enter-zone" data-zone-target="${z.id}">${z.action} ↗</button><p class="small">Illustrated school world. Activities open on this site.</p>`;
+  return `<div class="map-detail-heading"><span class="map-signal" aria-hidden="true"></span><h2>${esc(z.name)}</h2></div><p class="map-companion">${esc(z.companion)}</p><p>${esc(z.text)}</p>${z.infraNote ? `<p class="small" style="color:var(--lime);margin-top:6px"><strong>Infrastructure Layer:</strong> ${esc(z.infraNote)}</p>` : ''}<div class="actions" style="margin-top:12px"><button class="button" id="enter-zone" data-zone-target="${esc(z.id)}">${esc(z.action)} ↗</button><button class="button secondary" type="button" id="open-wiki-from-spot">Open World Wiki ↗</button></div><p class="small">Pizza Ninjas IP School × Spellverse World Map. Activities open on this site.</p>`;
+}
+
+function renderSpotChatHtml(spot) {
+  const list = spotChats[spot.id] || [];
+  const starters = spot.starters || ['What would you build or improve at this campus node?'];
+  return `
+    <div id="chathead">
+      <div id="chatheadtop">
+        <span id="chatbuilding">${esc(spot.name)}</span>
+        <button type="button" id="chatclose" aria-label="Minimize thread">−</button>
+      </div>
+      <div id="chatdesc">${esc(spot.companion)} — ${esc(spot.infraNote || spot.text)}</div>
+    </div>
+    <div id="chatprompts">
+      <div id="chatpromptlabel">Discussion Starters (Click to Fill)</div>
+      ${starters.map(p => `<button type="button" class="chatprompt" data-starter-prompt="${esc(p)}">“${esc(p)}”</button>`).join('')}
+    </div>
+    <div id="chatmsgs">
+      ${
+        list.length
+          ? list
+              .map(
+                m => `<div class="cmsg">
+                  <div class="cmsg-head"><span class="cmsg-author">${esc(m.author)}</span><span class="cmsg-time">${esc(m.time)}</span></div>
+                  <div class="cmsg-text">${esc(m.text)}</div>
+                </div>`
+              )
+              .join('')
+          : `<div class="cmsg"><div class="cmsg-text">No notes pinned here yet. Start the thread below!</div></div>`
+      }
+    </div>
+    <form id="chatinputrow">
+      <input type="text" id="chatinput" placeholder="Drop a reply at ${esc(spot.name)}..." maxlength="280" required />
+      <button type="submit" id="chatsend">Post ↗</button>
+    </form>
+  `;
+}
+
+function renderCommunityModalHtml() {
+  const totalReplies = Object.values(spotChats).reduce((acc, arr) => acc + arr.length, 0);
+  const weeks = [
+    ['Week 1', 'Paper Machines & Translucent Shell Form', 'COMPLETE', '100%'],
+    ['Week 2', 'NTAG215 NFC Cryptographic Binding & Identity', 'COMPLETE', '100%'],
+    ['Week 3', '7-Day Human-Approved Memory Ledger', 'ACTIVE NOW', '78%'],
+    ['Week 4', '20% Single-Hop Creator Royalty Settlement', 'UP NEXT', '45%'],
+    ['Week 5', 'Portal Machine 5-Stop Causeway Funnels', 'IN PROGRESS', '85%'],
+    ['Week 6', 'Three Company Identities: Food & Companion Infra', 'IN PROGRESS', '70%'],
+    ['Week 7', 'Savannah / SCAD 3-Adult Live Recall Study', 'SCHEDULED', '30%'],
+    ['Week 8', 'Demo Day, Investor Data Room & Cohort Launch', 'SCHEDULED', '20%']
+  ];
+  return `
+    <div class="pz-modal-backdrop" id="communitymodal" role="dialog" aria-modal="true" aria-label="8-Week IP School & SCAD Accelerator">
+      <div class="pz-modal">
+        <div class="pz-modal-header">
+          <div>
+            <span style="font-size:11px;letter-spacing:1.4px;color:var(--accent)">PIZZA NINJAS IP SCHOOL × ROBOTIC DISCIPLINE ACCELERATOR</span>
+            <h2>8-WEEK CAPITAL CAMPUS &amp; SPELLVERSE ROADMAP</h2>
+          </div>
+          <button type="button" class="pz-modal-close" data-close-modal="true">✕</button>
+        </div>
+        <div class="pz-modal-body">
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-bottom:22px">
+            <div class="panel" style="display:flex;align-items:center;gap:12px">
+              <svg width="28" height="28"><use href="#metric-contributions"/></svg>
+              <div><strong style="font-size:22px;color:var(--accent)">${visitedZones.size + visitedStops.size}</strong><div class="small">Zones &amp; Stops Explored</div></div>
+            </div>
+            <div class="panel" style="display:flex;align-items:center;gap:12px">
+              <svg width="28" height="28"><use href="#metric-ideas"/></svg>
+              <div><strong style="font-size:22px;color:var(--lime)">${mapIdeaDots.length}</strong><div class="small">On-Map Idea Dots</div></div>
+            </div>
+            <div class="panel" style="display:flex;align-items:center;gap:12px">
+              <svg width="28" height="28"><use href="#metric-replies"/></svg>
+              <div><strong style="font-size:22px;color:var(--orange)">${totalReplies}</strong><div class="small">Campus Spot Replies</div></div>
+            </div>
+            <div class="panel" style="display:flex;align-items:center;gap:12px">
+              <svg width="28" height="28"><use href="#metric-wiki"/></svg>
+              <div><strong style="font-size:22px;color:#38bdf8">38</strong><div class="small">/seed/ Wiki Chapters</div></div>
+            </div>
+          </div>
+
+          <h3>8-Week Curriculum &amp; Build Milestones</h3>
+          <div class="lesson-grid" style="margin-top:12px">
+            ${weeks
+              .map(
+                ([wk, title, status, pct]) => `<div class="panel">
+                  <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--accent)"><span>${wk}</span><span>${status} (${pct})</span></div>
+                  <h4 style="font-size:20px;margin:6px 0">${title}</h4>
+                  <div style="height:6px;background:#26262b;border-radius:99px;overflow:hidden"><div style="width:${pct};height:100%;background:linear-gradient(90deg,#fe5400,#ffd400)"></div></div>
+                </div>`
+              )
+              .join('')}
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function renderWikiModalHtml() {
+  const wikiEntries = [
+    {
+      cat: 'Three Identities',
+      title: threeIdentitiesThesis.roboticDiscipline.title,
+      body: threeIdentitiesThesis.roboticDiscipline.summary
+    },
+    {
+      cat: 'Three Identities',
+      title: threeIdentitiesThesis.foodRecovery.title,
+      body: threeIdentitiesThesis.foodRecovery.summary
+    },
+    ...mapZones.map(z => ({
+      cat: 'Campus Zones',
+      title: `${z.name} (${z.short})`,
+      body: `${z.text} — ${z.infraNote}`
+    })),
+    ...mapPortals.map(p => ({
+      cat: 'Spellverse Portals',
+      title: p.name,
+      body: `${p.text} — ${p.infraNote}`
+    })),
+    {
+      cat: 'Companions',
+      title: 'PATCH, MOSS, PIP & WAVE-08 Hardware Spec',
+      body: 'PATCH (curious maker rabbit), MOSS (steady observer tortoise), PIP (bright collaborator bird), and WAVE-08 (Cobalt Scout 3D-printed 2.4mm translucent shell with 28mm NTAG215 NFC base cavity and 20% single-hop royalty ledger).'
+    }
+  ];
+
+  const cats = ['All', 'Three Identities', 'Campus Zones', 'Spellverse Portals', 'Companions'];
+  const filtered = wikiEntries.filter(e => {
+    if (wikiCategory !== 'All' && e.cat !== wikiCategory) return false;
+    if (wikiSearch && !`${e.title} ${e.body}`.toLowerCase().includes(wikiSearch.toLowerCase())) return false;
+    return true;
+  });
+
+  return `
+    <div class="pz-modal-backdrop" id="wikimodal" role="dialog" aria-modal="true" aria-label="World Wiki & Three Identities Codex">
+      <div class="pz-modal">
+        <div class="pz-modal-header">
+          <div>
+            <span style="font-size:11px;letter-spacing:1.4px;color:var(--lime)">WORLD WIKI &amp; SPELLVERSE CODEX</span>
+            <h2>CAPITAL CAMPUS, THREE IDENTITIES &amp; /SEED/ LORE</h2>
+          </div>
+          <button type="button" class="pz-modal-close" data-close-modal="true">✕</button>
+        </div>
+        <div class="pz-modal-body">
+          <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px">
+            <input type="search" id="wiki-search-input" value="${esc(wikiSearch)}" placeholder="Search World Wiki, Three Identities, companions, zones..." style="flex:1;min-width:220px" />
+            <a href="#blueprint" class="button orange" data-close-modal="true">Open Full 38-Doc White Paper Studio ↗</a>
+          </div>
+          <div class="filter-row" style="margin-bottom:16px">
+            ${cats.map(c => `<button type="button" class="filter" aria-pressed="${wikiCategory === c}" data-wiki-cat="${c}">${c}</button>`).join('')}
+          </div>
+          <div class="lesson-grid">
+            ${filtered
+              .map(
+                e => `<article class="panel">
+                  <span style="font-size:10px;color:var(--accent);letter-spacing:1px">${esc(e.cat.toUpperCase())}</span>
+                  <h3 style="font-size:21px;margin:6px 0">${esc(e.title)}</h3>
+                  <p style="font-size:13.5px;color:#d7d2c8">${esc(e.body)}</p>
+                </article>`
+              )
+              .join('')}
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function renderWelcomeModalHtml() {
+  return `
+    <div class="pz-modal-backdrop" id="welcome-modal" role="dialog" aria-modal="true" aria-label="Welcome to Capital Campus">
+      <div id="welcomecard">
+        <span style="font-size:11px;letter-spacing:1.6px;color:var(--accent)">PIZZA NINJAS IP SCHOOL × SPELLVERSE × ROBOTIC DISCIPLINE</span>
+        <h2>WELCOME TO CAPITAL CAMPUS</h2>
+        <p>Explore an interactive living world that unites our entire previous state—the <strong>Portal Machine Story Maps</strong>, the <strong>Three Company Identities Infrastructure Thesis</strong>, the <strong>38-Document White Paper &amp; CAD Blueprint Studio</strong>, and the <strong>6 Robotic Discipline School Zones</strong>.</p>
+        <p style="font-size:13px;color:#bdb7ad">
+          • <strong>Drag or use Arrow Keys</strong> to pan across the illustrated island.<br>
+          • <strong>Press Z / X</strong> to zoom in and out.<br>
+          • <strong>Press SPACEBAR (Teleport)</strong> to fly smoothly from beacon to beacon.<br>
+          • <strong>Click any Pin or Idea Dot</strong> to open its Pocket Card, curved guide line, and live discussion thread.
+        </p>
+        <div class="actions" style="justify-content:center;margin-top:18px">
+          <button type="button" class="button" data-close-modal="true">Enter the World Map ↗</button>
+          <a href="#portal" class="button secondary" data-close-modal="true">Open 6-App Portal Machine</a>
+        </div>
+      </div>
+    </div>
+  `;
 }
 
 function schoolMap() {
-  const z = mapZones.find(z => z.id === selectedZone);
-  return `<div class="map-intro"><div><h1>FIND YOUR NEXT<br>“WHAT IF?”</h1><p>A little world for making, remembering, and seeing things differently. Choose a place to begin.</p></div><a class="text-link" href="#school">Browse all exercises ↗</a></div><section class="map-shell" aria-label="Interactive school world"><div class="map-toolbar"><span>THE SCHOOL WORLD (${visitedZones.size} / 6 ZONES EXPLORED)</span><div class="map-tools" role="group" aria-label="Map view controls"><button type="button" id="map-minus" aria-label="Zoom out">−</button><output id="map-zoom" aria-label="Map zoom">100%</output><button type="button" id="map-plus" aria-label="Zoom in">+</button><button type="button" id="map-reset">Reset view</button></div></div><div id="map-viewport" class="map-viewport" tabindex="0" aria-label="School map. Drag to explore."><div id="map-world" class="map-world"><img src="assets/school-world-map.png" alt="Original illustrated campus with six buildings and gardens connected around a companion plaza." width="1536" height="1024" draggable="false">${mapZones.map(z => `<button type="button" class="map-pin ${z.id === selectedZone ? 'selected' : ''}" data-zone="${z.id}" style="left:${z.x}%;top:${z.y}%" aria-label="Explore ${z.name}" aria-pressed="${z.id === selectedZone}"><span class="pin-dot" aria-hidden="true"></span><span>${z.name}</span></button>`).join('')}<button type="button" class="companion-pin" data-companion-map="true" style="left:50%;top:49%" aria-label="Meet the companions at the central plaza"><span>MEET THE COMPANIONS ↗</span></button></div></div><p class="map-help">Drag to explore · + / − to zoom · Arrow keys to pan · Select a place to see what’s inside.</p></section><div class="map-bottom"><nav class="map-directory" aria-label="Choose a map destination">${mapZones.map(z => `<button type="button" data-zone="${z.id}" class="${selectedZone === z.id ? 'selected' : ''}" aria-pressed="${z.id === selectedZone}"><span>${z.short}</span>${z.name}<span aria-hidden="true">↗</span></button>`).join('')}</nav><section id="map-detail" class="map-detail" aria-live="polite" aria-atomic="true">${zoneDetail(z)}</section></div>`;
+  const z = getSpotById(selectedZone);
+  const tr = radioTracks[radioIndex];
+
+  // Ley-lines connecting central plaza (50,52) to all 6 zones and 4 portals
+  const leyLinesSvg = `
+    <svg class="spellverse-leylines" viewBox="0 0 1200 800" preserveAspectRatio="none" aria-hidden="true">
+      ${[...mapZones, ...mapPortals]
+        .map(node => {
+          const x1 = 50 * 12;
+          const y1 = 52 * 8;
+          const x2 = node.x * 12;
+          const y2 = node.y * 8;
+          return `<line class="ley-path" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" />`;
+        })
+        .join('')}
+      <circle cx="600" cy="416" r="68" fill="none" stroke="rgba(255,212,0,0.3)" stroke-width="2" stroke-dasharray="6 6"/>
+    </svg>
+  `;
+
+  return `
+    <div class="map-intro">
+      <div>
+        <h1>FIND YOUR NEXT<br>“WHAT IF?”</h1>
+        <p>Reengineered with the <strong>Pizza Ninjas IP School</strong> &amp; <strong>Taproot Wizards Spellverse</strong> stage engine: full-canvas pan/zoom, Golden-Ratio Fibonacci bird flocks, drifting cloud shaders, physical <code>Z</code>/<code>X</code>/<code>Space</code>/<code>Arrow</code> keycaps, synth radio, and on-map idea pins.</p>
+      </div>
+      <div class="actions">
+        <a class="button orange" href="#portal">Open 6-App Portal Machine ↗</a>
+        <a class="button secondary" href="#blueprint">White Paper &amp; CAD Studio ↗</a>
+        <a class="text-link" href="#school">Browse all exercises ↗</a>
+      </div>
+    </div>
+
+    <section class="map-shell" id="pz-stage" aria-label="Interactive Pizza Ninjas x Spellverse School World">
+      <!-- 1. MAP VIEWPORT & WORLD CANVAS -->
+      <div id="map-viewport" class="map-viewport" tabindex="0" aria-label="School map. Drag to explore, press Space to teleport.">
+        <div id="map-world" class="map-world">
+          <img src="assets/school-world-map.png" alt="Original illustrated campus with six buildings and gardens connected around a companion plaza." width="1536" height="1024" draggable="false">
+          ${leyLinesSvg}
+
+          <!-- 6 Original School Campus Zone Pins -->
+          ${mapZones
+            .map(
+              zone => `<button type="button" class="map-pin ${zone.id === selectedZone ? 'selected' : ''}" data-zone="${esc(zone.id)}" style="left:${zone.x}%;top:${zone.y}%" aria-label="Explore ${esc(zone.name)}" aria-pressed="${zone.id === selectedZone}">
+                <span class="pin-dot" aria-hidden="true"></span>
+                <span>${esc(zone.name)}</span>
+              </button>`
+            )
+            .join('')}
+
+          <!-- 4 Spellverse × Portal Machine Gateway Pins -->
+          ${mapPortals
+            .filter(p => p.kind === 'portal')
+            .map(
+              p => `<button type="button" class="portal-pin ${p.id === selectedZone ? 'selected' : ''}" data-zone="${esc(p.id)}" style="left:${p.x}%;top:${p.y}%" aria-label="${esc(p.name)}" aria-pressed="${p.id === selectedZone}">
+                <span class="pin-dot" aria-hidden="true"></span>
+                <span>${esc(p.name)}</span>
+              </button>`
+            )
+            .join('')}
+
+          <!-- Central Companion Plaza Pin -->
+          <button type="button" class="companion-pin ${selectedZone === 'companion-plaza' ? 'selected' : ''}" data-zone="companion-plaza" data-companion-map="true" style="left:50%;top:52%" aria-label="Meet the companions at the central plaza">
+            <span>⚡ COMPANION PLAZA (PATCH · MOSS · PIP) ↗</span>
+          </button>
+
+          <!-- On-Map Community Idea Dots (.msgdot) -->
+          ${mapIdeaDots
+            .map(
+              d => `<button type="button" class="msgdot ${d.id === selectedZone ? 'selected' : ''}" data-zone="${esc(d.id)}" style="left:${d.x}%;top:${d.y}%" title="${esc(d.name)} (${esc(d.author)})" aria-label="${esc(d.name)}"></button>`
+            )
+            .join('')}
+        </div>
+      </div>
+
+      <!-- 2. ATMOSPHERIC WORLD FX LAYER (7 Clouds + Sunwash + Fibonacci Birds Canvas) -->
+      <div id="worldFx" aria-hidden="true">
+        <div id="worldFxTrack">
+          <div id="clouds">
+            <div class="cloud far" style="width:360px;height:130px;left:4%;top:8%;--cdur:78s;--cdelay:-12s"></div>
+            <div class="cloud c2" style="width:420px;height:150px;left:32%;top:5%;--cdur:94s;--cdelay:-38s"></div>
+            <div class="cloud c3 near" style="width:480px;height:170px;left:66%;top:12%;--cdur:68s;--cdelay:-21s"></div>
+            <div class="cloud far" style="width:340px;height:120px;left:14%;top:58%;--cdur:88s;--cdelay:-45s"></div>
+            <div class="cloud c2" style="width:390px;height:140px;left:54%;top:72%;--cdur:82s;--cdelay:-19s"></div>
+            <div class="cloud c3" style="width:320px;height:115px;left:78%;top:48%;--cdur:74s;--cdelay:-8s"></div>
+            <div class="cloud far" style="width:410px;height:145px;left:40%;top:36%;--cdur:102s;--cdelay:-60s"></div>
+          </div>
+          <div id="sunwash"></div>
+          <div id="atmosphere"></div>
+          <canvas id="birds" width="1200" height="800"></canvas>
+        </div>
+      </div>
+
+      <!-- 3. CURVED DASHED SVG GUIDE LINE (#chatguide) CONNECTING #spotcard TO ACTIVE PIN -->
+      <svg id="chatguide" aria-hidden="true">
+        <path id="chatguidepath" d="" />
+        <circle id="chatguidedot" cx="-100" cy="-100" r="6" />
+      </svg>
+
+      <!-- 4. FLOATING HUD LAYER (#mapui) -->
+      <div id="mapui">
+        <!-- TOP BAR: Left Radio Pill + Center 8-Week Marquee + Right Action Pills -->
+        <div id="maptopbar">
+          <!-- Left: Synth Radio Pill (#musichud) -->
+          <div id="musichud">
+            <div id="radiobar">
+              <div id="radiodisc" aria-hidden="true"></div>
+              <div id="trackmeta" id="radio-expand-trigger" title="Click to toggle tracklist">
+                <div id="tracktitle">${esc(tr.title)}</div>
+                <div id="trackartist">${esc(tr.artist)}</div>
+              </div>
+              <button type="button" class="mbtn" id="prevbtn" aria-label="Previous track">⏮</button>
+              <button type="button" class="mbtn" id="playpausebtn" aria-label="Play or pause radio">${radioPlaying ? '⏸' : '▶'}</button>
+              <button type="button" class="mbtn" id="nextbtn" aria-label="Next track">⏭</button>
+              <button type="button" class="mbtn ${radioLiked ? 'liked' : ''}" id="likebtn" aria-label="Like track">${radioLiked ? '♥' : '♡'}</button>
+            </div>
+            <div id="radioextras" class="${radioExpanded ? 'open' : ''}">
+              <div style="font-size:10px;color:var(--accent);letter-spacing:1px">CAMPUS SYNTH RADIO (4 TRACKS)</div>
+              ${radioTracks
+                .map(
+                  (t, idx) => `<button type="button" data-radio-idx="${idx}" style="text-align:left;background:${idx === radioIndex ? 'rgba(255,212,0,0.16)' : 'transparent'};border:1px solid #353845;color:#fff;padding:5px 8px;border-radius:6px;font-size:11px;cursor:pointer">
+                    ${idx + 1}. ${esc(t.title)} — <span style="color:#9d9992">${esc(t.artist)}</span>
+                  </button>`
+                )
+                .join('')}
+            </div>
+          </div>
+
+          <!-- Center: 8-Week IP School & SCAD Accelerator Marquee + Live Countdown (#weekstrip) -->
+          <div id="weekstrip" role="button" tabindex="0" aria-label="Open 8-Week IP School & SCAD Accelerator Modal">
+            <span class="wtag">WEEK 3 OF 8</span>
+            <div class="wgoal">
+              <div class="marquee-track">
+                <span>PIZZA NINJAS IP SCHOOL × SPELLVERSE × ROBOTIC DISCIPLINE — THREE COMPANY IDENTITIES: VERTICALLY INTEGRATED INFRASTRUCTURE — CLICK TO VIEW 8-WEEK ROADMAP &amp; LEADERBOARD &nbsp;&bull;&nbsp;</span>
+                <span>PIZZA NINJAS IP SCHOOL × SPELLVERSE × ROBOTIC DISCIPLINE — THREE COMPANY IDENTITIES: VERTICALLY INTEGRATED INFRASTRUCTURE — CLICK TO VIEW 8-WEEK ROADMAP &amp; LEADERBOARD &nbsp;&bull;&nbsp;</span>
+              </div>
+            </div>
+            <span class="wclock" id="pz-countdown">04d 11h 42m</span>
+          </div>
+
+          <!-- Right: Action Pills (#toplinks) -->
+          <div id="toplinks">
+            <button type="button" class="toppill" id="wikibtn">✦ World Wiki &amp; 3 Identities</button>
+            <button type="button" class="toppill" id="open-community-btn">8-Week School</button>
+            <button type="button" class="toppill" id="open-welcome-btn">Welcome</button>
+            <button type="button" class="toppill" id="map-minus" aria-label="Zoom out">−</button>
+            <output id="map-zoom" aria-label="Map zoom" style="font-size:11px;font-weight:700;padding:0 4px;align-self:center">100%</output>
+            <button type="button" class="toppill" id="map-plus" aria-label="Zoom in">+</button>
+            <button type="button" class="toppill" id="map-reset">Reset</button>
+          </div>
+        </div>
+
+        <!-- LEFT POCKET PLACE CARD (#spotcard) -->
+        <aside id="spotcard" aria-live="polite">
+          <div class="spot-kicker">${esc(z.short || 'CAMPUS BEACON')} // ${visitedZones.size} ZONES EXPLORED</div>
+          <h2>${esc(z.name)}</h2>
+          <p><strong>${esc(z.companion)}</strong><br>${esc(z.text)}</p>
+          ${z.infraNote ? `<p style="font-size:11.5px;color:var(--lime);border-left:2px solid var(--lime);padding-left:8px">${esc(z.infraNote)}</p>` : ''}
+          <div class="spot-actions">
+            <button type="button" class="button" id="enter-zone" data-zone-target="${esc(z.id)}" style="padding:8px 12px;font-size:12px">${esc(z.action)} ↗</button>
+            <button type="button" class="button secondary" id="fly-spot-btn" style="padding:8px 12px;font-size:12px">🎯 Focus</button>
+          </div>
+        </aside>
+
+        <!-- RIGHT FLOATING DISCUSSION THREAD (#chatroom) -->
+        <aside id="chatroom" aria-label="Spot Discussion Thread">
+          ${renderSpotChatHtml(z)}
+        </aside>
+
+        <!-- BOTTOM-LEFT ZOOM KEYCAPS (#blhud: Z and X) -->
+        <div id="blhud">
+          <div id="zoomhud">
+            <div class="hudtitle">Zoom with Z and X</div>
+            <div class="zrow">
+              <div class="key" id="kz" data-keycap="z" role="button" tabindex="0" aria-label="Zoom in with Z"><span class="kcap">Z</span></div>
+              <div class="key" id="kx" data-keycap="x" role="button" tabindex="0" aria-label="Zoom out with X"><span class="kcap">X</span></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- BOTTOM-CENTER TELEPORT SPACEBAR KEYCAP (#spacehud) + DROP IDEA BUTTON (#chatplace) -->
+        <div id="spacehud">
+          <button type="button" id="chatplace" class="${placingIdeaMode ? 'active' : ''}">
+            <svg width="14" height="14" style="vertical-align:-2px;margin-right:4px"><use href="#icon-quill"/></svg>
+            ${placingIdeaMode ? 'Click Anywhere on Map to Plant Idea Pin (Esc to Cancel)' : '💬 Drop an Idea on the Map'}
+          </button>
+          <div class="hudtitle">Press Space to Teleport</div>
+          <div class="key" id="kspace" data-keycap="space" role="button" tabindex="0" aria-label="Teleport to next spot">
+            <span class="kcap">SPACE — TELEPORT</span>
+          </div>
+        </div>
+
+        <!-- BOTTOM-RIGHT ARROW KEYCAPS (#panhud) -->
+        <div id="panhud">
+          <div class="hudtitle">Navigate with arrow keys</div>
+          <div class="arrowgrid">
+            <div class="key up" id="kup" data-keycap="up" role="button" tabindex="0" aria-label="Pan up"><span class="kcap">▲</span></div>
+            <div class="key left" id="kleft" data-keycap="left" role="button" tabindex="0" aria-label="Pan left"><span class="kcap">◀</span></div>
+            <div class="key down" id="kdown" data-keycap="down" role="button" tabindex="0" aria-label="Pan down"><span class="kcap">▼</span></div>
+            <div class="key right" id="kright" data-keycap="right" role="button" tabindex="0" aria-label="Pan right"><span class="kcap">▶</span></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ACTIVE MODAL OVERLAY (8-Week School / World Wiki / Welcome) -->
+      <div id="pz-modal-host">
+        ${activeMapModal === 'community' ? renderCommunityModalHtml() : ''}
+        ${activeMapModal === 'wiki' ? renderWikiModalHtml() : ''}
+        ${activeMapModal === 'welcome' ? renderWelcomeModalHtml() : ''}
+      </div>
+    </section>
+
+    <!-- DIRECTORY & DETAIL PANEL BELOW STAGE (PRESERVED FROM PREVIOUS STATE) -->
+    <div class="map-bottom">
+      <nav class="map-directory" aria-label="Choose a map destination">
+        ${[...mapZones, ...mapPortals]
+          .map(
+            item => `<button type="button" data-zone="${esc(item.id)}" class="${selectedZone === item.id ? 'selected' : ''}" aria-pressed="${selectedZone === item.id}">
+              <span>${esc(item.short)}</span>${esc(item.name)}<span aria-hidden="true">↗</span>
+            </button>`
+          )
+          .join('')}
+      </nav>
+      <section id="map-detail" class="map-detail" aria-live="polite" aria-atomic="true">
+        ${zoneDetail(z)}
+      </section>
+    </div>
+  `;
 }
 
-function selectZone(id) {
-  const z = mapZones.find(z => z.id === id);
+// Update the curved dashed SVG line (#chatguide) from #spotcard to the active pin
+function updateChatGuideLine() {
+  const stage = document.querySelector('#pz-stage');
+  const card = document.querySelector('#spotcard');
+  const pathEl = document.querySelector('#chatguidepath');
+  const dotEl = document.querySelector('#chatguidedot');
+  const pinEl = document.querySelector(`[data-zone="${selectedZone}"]`);
+  if (!stage || !card || !pathEl || !dotEl || !pinEl) return;
+
+  const sr = stage.getBoundingClientRect();
+  const cr = card.getBoundingClientRect();
+  const pr = pinEl.getBoundingClientRect();
+
+  const x1 = cr.right - sr.left - 6;
+  const y1 = cr.top - sr.top + cr.height * 0.45;
+  const x2 = pr.left - sr.left + pr.width * 0.5;
+  const y2 = pr.top - sr.top + pr.height * 0.5;
+
+  const dx = x2 - x1;
+  const cx1 = x1 + dx * 0.45;
+  const cy1 = y1 - Math.min(70, Math.abs(dx) * 0.2);
+  const cx2 = x1 + dx * 0.75;
+  const cy2 = y2 - 20;
+
+  pathEl.setAttribute('d', `M ${x1.toFixed(1)} ${y1.toFixed(1)} C ${cx1.toFixed(1)} ${cy1.toFixed(1)}, ${cx2.toFixed(1)} ${cy2.toFixed(1)}, ${x2.toFixed(1)} ${y2.toFixed(1)}`);
+  dotEl.setAttribute('cx', x2.toFixed(1));
+  dotEl.setAttribute('cy', y2.toFixed(1));
+}
+
+function selectZone(id, shouldFly = true) {
+  const z = getSpotById(id);
   if (!z) return;
-  selectedZone = id;
-  visitedZones.add(id);
+  selectedZone = z.id;
+  visitedZones.add(z.id);
   updateQuestHud();
+
   document.querySelectorAll('[data-zone]').forEach(b => {
-    b.classList.toggle('selected', b.dataset.zone === id);
-    b.setAttribute('aria-pressed', String(b.dataset.zone === id));
+    const isSel = b.dataset.zone === z.id;
+    b.classList.toggle('selected', isSel);
+    b.setAttribute('aria-pressed', String(isSel));
   });
+
   const detailEl = document.querySelector('#map-detail');
   if (detailEl) detailEl.innerHTML = zoneDetail(z);
+
+  const spotCard = document.querySelector('#spotcard');
+  if (spotCard) {
+    spotCard.innerHTML = `
+      <div class="spot-kicker">${esc(z.short || 'CAMPUS BEACON')} // ${visitedZones.size} ZONES EXPLORED</div>
+      <h2>${esc(z.name)}</h2>
+      <p><strong>${esc(z.companion)}</strong><br>${esc(z.text)}</p>
+      ${z.infraNote ? `<p style="font-size:11.5px;color:var(--lime);border-left:2px solid var(--lime);padding-left:8px">${esc(z.infraNote)}</p>` : ''}
+      <div class="spot-actions">
+        <button type="button" class="button" id="enter-zone" data-zone-target="${esc(z.id)}" style="padding:8px 12px;font-size:12px">${esc(z.action)} ↗</button>
+        <button type="button" class="button secondary" id="fly-spot-btn" style="padding:8px 12px;font-size:12px">🎯 Focus</button>
+      </div>
+    `;
+  }
+
+  const chatRoom = document.querySelector('#chatroom');
+  if (chatRoom) {
+    chatRoom.style.display = '';
+    chatRoom.innerHTML = renderSpotChatHtml(z);
+  }
+
+  if (shouldFly) {
+    flyTo(z.x / 100, z.y / 100, Math.max(mapView.scale, mapView.fit * 1.32), 620);
+  } else {
+    updateChatGuideLine();
+  }
+}
+
+// Smooth camera glide (Pizza Ninjas flyTo)
+function flyTo(fx, fy, targetScale, durationMs = 650) {
+  const vp = document.querySelector('#map-viewport');
+  if (!vp) return;
+  cancelAnimationFrame(flyAnimFrame);
+
+  const startScale = mapView.scale;
+  const endScale = Math.max(mapView.fit, Math.min(mapView.fit * 3, targetScale || startScale));
+  const startX = mapView.x;
+  const startY = mapView.y;
+
+  const targetX = vp.clientWidth * 0.5 - fx * 1200 * endScale;
+  const targetY = vp.clientHeight * 0.5 - fy * 800 * endScale;
+  const t0 = performance.now();
+
+  function step(now) {
+    const p = Math.min(1, (now - t0) / durationMs);
+    const ease = 1 - Math.pow(1 - p, 3); // cubic ease-out
+    mapView.scale = startScale + (endScale - startScale) * ease;
+    mapView.x = startX + (targetX - startX) * ease;
+    mapView.y = startY + (targetY - startY) * ease;
+    renderMap();
+    if (p < 1) {
+      flyAnimFrame = requestAnimationFrame(step);
+    }
+  }
+  flyAnimFrame = requestAnimationFrame(step);
+}
+
+// Teleport to a random unvisited spot (Spacebar mechanic from Pizza Ninjas)
+function teleportNextSpot() {
+  const all = getAllMapSpots();
+  if (!teleportQueue.length) {
+    teleportQueue = all.map(s => s.id).filter(id => id !== selectedZone);
+    // Shuffle
+    for (let i = teleportQueue.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [teleportQueue[i], teleportQueue[j]] = [teleportQueue[j], teleportQueue[i]];
+    }
+  }
+  const nextId = teleportQueue.pop() || all[0].id;
+  selectZone(nextId, true);
+  const spot = getSpotById(nextId);
+  toast(`⚡ Teleported to ${spot.name}!`);
 }
 
 function renderMap() {
-  const vp = document.querySelector('#map-viewport'), world = document.querySelector('#map-world');
+  const vp = document.querySelector('#map-viewport');
+  const world = document.querySelector('#map-world');
   if (!vp || !world) return;
-  const w = vp.clientWidth, h = vp.clientHeight, mw = 1200 * mapView.scale, mh = 800 * mapView.scale;
-  mapView.x = mw <= w ? (w - mw) / 2 : Math.max(w - mw - 30, Math.min(30, mapView.x));
-  mapView.y = mh <= h ? (h - mh) / 2 : Math.max(h - mh - 30, Math.min(30, mapView.y));
+  const w = vp.clientWidth;
+  const h = vp.clientHeight;
+  const mw = 1200 * mapView.scale;
+  const mh = 800 * mapView.scale;
+  mapView.x = mw <= w ? (w - mw) / 2 : Math.max(w - mw - 60, Math.min(60, mapView.x));
+  mapView.y = mh <= h ? (h - mh) / 2 : Math.max(h - mh - 60, Math.min(60, mapView.y));
+
   world.style.transform = `translate(${mapView.x}px,${mapView.y}px) scale(${mapView.scale})`;
   world.style.setProperty('--pin-scale', 1 / mapView.scale);
+
+  // Sync #worldFxTrack with world transform so clouds & birds drift in world space
+  const fxTrack = document.querySelector('#worldFxTrack');
+  if (fxTrack) {
+    fxTrack.style.transform = `translate(${mapView.x}px,${mapView.y}px) scale(${mapView.scale})`;
+  }
+
   const zoom = Math.round((mapView.scale / mapView.fit) * 100);
-  document.querySelector('#map-zoom').textContent = `${zoom}%`;
-  document.querySelector('#map-minus').disabled = zoom <= 100;
-  document.querySelector('#map-plus').disabled = zoom >= 300;
+  const zoomOut = document.querySelector('#map-zoom');
+  if (zoomOut) zoomOut.textContent = `${zoom}%`;
+  const minusBtn = document.querySelector('#map-minus');
+  const plusBtn = document.querySelector('#map-plus');
+  if (minusBtn) minusBtn.disabled = zoom <= 100;
+  if (plusBtn) plusBtn.disabled = zoom >= 300;
+
+  updateChatGuideLine();
 }
 
 function resetMap() {
   const vp = document.querySelector('#map-viewport');
   if (!vp) return;
-  mapView.fit = Math.min(vp.clientWidth / 1200, vp.clientHeight / 800);
+  mapView.fit = Math.max(0.4, Math.min(vp.clientWidth / 1200, vp.clientHeight / 800));
   mapView.scale = mapView.fit;
-  mapView.x = 0;
-  mapView.y = 0;
+  mapView.x = (vp.clientWidth - 1200 * mapView.scale) / 2;
+  mapView.y = (vp.clientHeight - 800 * mapView.scale) / 2;
   renderMap();
 }
 
 function zoomMap(factor) {
   const vp = document.querySelector('#map-viewport');
   if (!vp) return;
-  const old = mapView.scale, next = Math.max(mapView.fit, Math.min(mapView.fit * 3, old * factor));
-  const cx = vp.clientWidth / 2, cy = vp.clientHeight / 2;
+  const old = mapView.scale;
+  const next = Math.max(mapView.fit, Math.min(mapView.fit * 3, old * factor));
+  const cx = vp.clientWidth / 2;
+  const cy = vp.clientHeight / 2;
   mapView.x = cx - ((cx - mapView.x) * next) / old;
   mapView.y = cy - ((cy - mapView.y) * next) / old;
   mapView.scale = next;
   renderMap();
+}
+
+// Golden-Ratio Fibonacci Bird Flocks on <canvas id="birds"> (from Pizza Ninjas)
+function startFibonacciBirds() {
+  cancelAnimationFrame(birdAnimFrame);
+  const canvas = document.querySelector('#birds');
+  if (!canvas || !canvas.getContext) return;
+  const ctx = canvas.getContext('2d');
+  const W = 1200;
+  const H = 800;
+  const PHI = (1 + Math.sqrt(5)) / 2;
+  const GOLD = (2 * Math.PI) / (PHI * PHI);
+  const FIB = [1, 2, 3, 5, 8, 1];
+  const PALETTE = ['#ffffff', '#fff3c4', '#ffd400', '#e0f2fe', '#fef08a'];
+
+  const flocks = FIB.map((count, fi) => {
+    const angle = (fi * GOLD) % (Math.PI * 2);
+    return {
+      cx: ((fi * 233) % (W - 200)) + 100,
+      cy: ((fi * 144) % (H - 160)) + 80,
+      vx: Math.cos(angle) * (0.42 + (fi % 3) * 0.14),
+      vy: Math.sin(angle) * (0.28 + (fi % 2) * 0.12),
+      birds: Array.from({ length: count }, (_, bi) => ({
+        ox: Math.cos(bi * GOLD) * (12 + bi * 7),
+        oy: Math.sin(bi * GOLD) * (10 + bi * 6),
+        phase: (bi * GOLD) % (Math.PI * 2),
+        size: 4.2 + ((bi + fi) % 3) * 1.1,
+        color: PALETTE[(fi + bi) % PALETTE.length]
+      }))
+    };
+  });
+
+  function drawBirds(now) {
+    if (!document.querySelector('#birds')) return;
+    ctx.clearRect(0, 0, W, H);
+    const t = now * 0.006;
+
+    for (const f of flocks) {
+      f.cx = (f.cx + f.vx + W) % W;
+      f.cy = (f.cy + f.vy + H) % H;
+      const heading = Math.atan2(f.vy, f.vx);
+
+      for (const b of f.birds) {
+        const bx = f.cx + b.ox + Math.sin(t * 0.4 + b.phase) * 4;
+        const by = f.cy + b.oy + Math.cos(t * 0.35 + b.phase) * 3;
+        const flap = Math.sin(t * 1.9 + b.phase);
+        const s = b.size;
+
+        // Soft shadow on water/island below
+        ctx.save();
+        ctx.translate(bx + 8, by + 18);
+        ctx.rotate(heading);
+        ctx.strokeStyle = 'rgba(0, 20, 35, 0.22)';
+        ctx.lineWidth = 1.4;
+        ctx.beginPath();
+        ctx.moveTo(-s, flap * s * 0.45);
+        ctx.quadraticCurveTo(0, 0, s, flap * s * 0.45);
+        ctx.stroke();
+        ctx.restore();
+
+        // Bird V-wing silhouette
+        ctx.save();
+        ctx.translate(bx, by);
+        ctx.rotate(heading);
+        ctx.strokeStyle = b.color;
+        ctx.lineWidth = 1.8;
+        ctx.lineCap = 'round';
+        ctx.beginPath();
+        ctx.moveTo(-s, flap * s * 0.65);
+        ctx.quadraticCurveTo(-s * 0.2, -s * 0.25, 0, 0);
+        ctx.quadraticCurveTo(s * 0.2, -s * 0.25, s, flap * s * 0.65);
+        ctx.stroke();
+        ctx.restore();
+      }
+    }
+    birdAnimFrame = requestAnimationFrame(drawBirds);
+  }
+  birdAnimFrame = requestAnimationFrame(drawBirds);
+}
+
+// 60fps Continuous Keycap Pan/Zoom Loop (Z, X, Arrow Keys)
+function ensureKeyLoop() {
+  if (keyLoopFrame) return;
+  function tick() {
+    const any = heldKeys.up || heldKeys.down || heldKeys.left || heldKeys.right || heldKeys.z || heldKeys.x;
+    if (!any || !document.querySelector('#map-viewport')) {
+      keyLoopFrame = 0;
+      return;
+    }
+    const panStep = 10;
+    if (heldKeys.left) mapView.x += panStep;
+    if (heldKeys.right) mapView.x -= panStep;
+    if (heldKeys.up) mapView.y += panStep;
+    if (heldKeys.down) mapView.y -= panStep;
+    if (heldKeys.z) zoomMap(1.022);
+    if (heldKeys.x) zoomMap(0.978);
+    if (heldKeys.left || heldKeys.right || heldKeys.up || heldKeys.down) renderMap();
+    keyLoopFrame = requestAnimationFrame(tick);
+  }
+  keyLoopFrame = requestAnimationFrame(tick);
+}
+
+function setKeycapDown(name, isDown) {
+  if (name in heldKeys) {
+    heldKeys[name] = isDown;
+    if (isDown) ensureKeyLoop();
+  }
+  const idMap = { z: '#kz', x: '#kx', space: '#kspace', up: '#kup', down: '#kdown', left: '#kleft', right: '#kright' };
+  const el = document.querySelector(idMap[name]);
+  if (el) el.classList.toggle('down', isDown);
 }
 
 function initMap() {
@@ -712,26 +1746,132 @@ function initMap() {
   resetMap();
   mapResizeObserver = new ResizeObserver(resetMap);
   mapResizeObserver.observe(vp);
+
+  startFibonacciBirds();
+  updateChatGuideLine();
+
   let drag = null;
   vp.addEventListener('pointerdown', e => {
     if (e.target.closest('button')) return;
+
+    // If user is in "Drop an Idea on the Map" mode, plant a new .msgdot at click coordinates!
+    if (placingIdeaMode) {
+      const world = document.querySelector('#map-world');
+      if (world) {
+        const rect = world.getBoundingClientRect();
+        const xPct = Math.max(5, Math.min(95, Math.round(((e.clientX - rect.left) / rect.width) * 100)));
+        const yPct = Math.max(8, Math.min(92, Math.round(((e.clientY - rect.top) / rect.height) * 100)));
+        const ideaTitle = window.prompt('Name your campus idea or infrastructure note:', 'New Surplus / Companion Node');
+        placingIdeaMode = false;
+        if (ideaTitle && ideaTitle.trim()) {
+          const newDot = {
+            id: 'idea-' + Date.now(),
+            kind: 'idea',
+            name: `Idea: ${ideaTitle.trim()}`,
+            short: 'IDEA DOT',
+            x: xPct,
+            y: yPct,
+            author: 'Campus Builder',
+            companion: 'COMMUNITY IDEA PIN // ON-MAP DROP',
+            text: ideaTitle.trim(),
+            infraNote: 'Planted directly on the Capital Campus × Spellverse World Map.',
+            action: 'Open Lab Exercise',
+            lesson: 'reverse',
+            starters: [`How would we prototype "${ideaTitle.trim()}" in Week 3?`]
+          };
+          mapIdeaDots.push(newDot);
+          try {
+            localStorage.setItem('rd-map-idea-dots', JSON.stringify(mapIdeaDots));
+          } catch {}
+          selectedZone = newDot.id;
+          route();
+          toast('💬 Planted your idea dot on the campus map!');
+          return;
+        }
+        route();
+      }
+      return;
+    }
+
+    cancelAnimationFrame(flyAnimFrame);
     drag = { px: e.clientX, py: e.clientY, x: mapView.x, y: mapView.y };
     vp.setPointerCapture(e.pointerId);
     vp.classList.add('dragging');
   });
+
   vp.addEventListener('pointermove', e => {
     if (!drag) return;
     mapView.x = drag.x + e.clientX - drag.px;
     mapView.y = drag.y + e.clientY - drag.py;
     renderMap();
   });
+
   const stop = () => {
     drag = null;
     vp.classList.remove('dragging');
   };
   vp.addEventListener('pointerup', stop);
   vp.addEventListener('pointercancel', stop);
+
+  // Wheel zoom on stage
+  vp.addEventListener(
+    'wheel',
+    e => {
+      e.preventDefault();
+      zoomMap(e.deltaY < 0 ? 1.12 : 0.89);
+    },
+    { passive: false }
+  );
 }
+
+// Keyboard listeners for Pizza Ninjas mechanical keycaps (Z, X, Space, Arrow keys, Escape)
+window.addEventListener('keydown', e => {
+  if (!document.querySelector('#pz-stage')) return;
+  const tag = (e.target && e.target.tagName) || '';
+  if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || (e.target && e.target.isContentEditable)) return;
+
+  const k = e.key.toLowerCase();
+  if (k === 'z') {
+    e.preventDefault();
+    setKeycapDown('z', true);
+  } else if (k === 'x') {
+    e.preventDefault();
+    setKeycapDown('x', true);
+  } else if (k === ' ' || e.code === 'Space') {
+    e.preventDefault();
+    setKeycapDown('space', true);
+    teleportNextSpot();
+  } else if (e.key === 'ArrowUp') {
+    e.preventDefault();
+    setKeycapDown('up', true);
+  } else if (e.key === 'ArrowDown') {
+    e.preventDefault();
+    setKeycapDown('down', true);
+  } else if (e.key === 'ArrowLeft') {
+    e.preventDefault();
+    setKeycapDown('left', true);
+  } else if (e.key === 'ArrowRight') {
+    e.preventDefault();
+    setKeycapDown('right', true);
+  } else if (e.key === 'Escape') {
+    if (placingIdeaMode || activeMapModal) {
+      placingIdeaMode = false;
+      activeMapModal = '';
+      route();
+    }
+  }
+});
+
+window.addEventListener('keyup', e => {
+  const k = e.key.toLowerCase();
+  if (k === 'z') setKeycapDown('z', false);
+  else if (k === 'x') setKeycapDown('x', false);
+  else if (k === ' ' || e.code === 'Space') setKeycapDown('space', false);
+  else if (e.key === 'ArrowUp') setKeycapDown('up', false);
+  else if (e.key === 'ArrowDown') setKeycapDown('down', false);
+  else if (e.key === 'ArrowLeft') setKeycapDown('left', false);
+  else if (e.key === 'ArrowRight') setKeycapDown('right', false);
+});
 
 const views = {
   portal: portalView,
@@ -748,8 +1888,12 @@ const views = {
 };
 
 function route() {
-  const key = location.hash.slice(1) || 'portal';
-  const view = views[key] ? key : 'portal';
+  const key = location.hash.slice(1) || 'map';
+  const view = views[key] ? key : 'map';
+  if (view !== 'map') {
+    document.body.classList.remove('world-fullscreen');
+    cancelAnimationFrame(birdAnimFrame);
+  }
   main.innerHTML = views[view]();
   document.querySelectorAll('[data-route]').forEach(a => {
     const on = a.dataset.route === view;
@@ -779,10 +1923,76 @@ function download(name, text, type) {
 
 let promptText = '';
 
+// On-screen keycap pointer hold support
+document.addEventListener('pointerdown', e => {
+  const keyEl = e.target.closest('[data-keycap]');
+  if (!keyEl) return;
+  const k = keyEl.dataset.keycap;
+  if (k === 'space') {
+    setKeycapDown('space', true);
+    teleportNextSpot();
+    setTimeout(() => setKeycapDown('space', false), 220);
+  } else {
+    setKeycapDown(k, true);
+  }
+});
+
+document.addEventListener('pointerup', () => {
+  ['z', 'x', 'up', 'down', 'left', 'right'].forEach(k => setKeycapDown(k, false));
+});
+
 document.addEventListener('click', async e => {
   const openDocLink = e.target.closest('[data-open-doc]');
   if (openDocLink) {
     selectedDocId = openDocLink.dataset.openDoc;
+  }
+
+  // Close modal backdrop or button
+  if (e.target.matches('[data-close-modal="true"]') || e.target.classList.contains('pz-modal-backdrop')) {
+    activeMapModal = '';
+    const host = document.querySelector('#pz-modal-host');
+    if (host) host.innerHTML = '';
+    return;
+  }
+
+  // Weekstrip opens 8-Week IP School modal
+  if (e.target.closest('#weekstrip') || e.target.closest('#open-community-btn')) {
+    activeMapModal = 'community';
+    const host = document.querySelector('#pz-modal-host');
+    if (host) host.innerHTML = renderCommunityModalHtml();
+    return;
+  }
+
+  // Wiki button opens World Wiki modal
+  if (e.target.closest('#wikibtn') || e.target.closest('#open-wiki-from-spot')) {
+    activeMapModal = 'wiki';
+    const host = document.querySelector('#pz-modal-host');
+    if (host) host.innerHTML = renderWikiModalHtml();
+    return;
+  }
+
+  // Welcome button opens Welcome Card modal
+  if (e.target.closest('#open-welcome-btn')) {
+    activeMapModal = 'welcome';
+    const host = document.querySelector('#pz-modal-host');
+    if (host) host.innerHTML = renderWelcomeModalHtml();
+    return;
+  }
+
+  // Wiki category filter inside modal
+  const wikiCatBtn = e.target.closest('[data-wiki-cat]');
+  if (wikiCatBtn) {
+    wikiCategory = wikiCatBtn.dataset.wikiCat;
+    const host = document.querySelector('#pz-modal-host');
+    if (host) host.innerHTML = renderWikiModalHtml();
+    return;
+  }
+
+  // Trackmeta click toggles radio tracklist
+  if (e.target.closest('#trackmeta') || e.target.closest('#radiodisc')) {
+    radioExpanded = !radioExpanded;
+    updateRadioDom();
+    return;
   }
 
   const stopCard = e.target.closest('[data-stop-idx]');
@@ -796,6 +2006,75 @@ document.addEventListener('click', async e => {
 
   const b = e.target.closest('button');
   if (!b) return;
+
+  // Fullscreen World Map toggle
+  if (b.id === 'toggle-fullscreen-world') {
+    if (location.hash.slice(1) !== 'map') {
+      location.hash = 'map';
+    }
+    document.body.classList.toggle('world-fullscreen');
+    b.textContent = document.body.classList.contains('world-fullscreen') ? '✕ Exit Fullscreen' : '⛶ Fullscreen Map';
+    setTimeout(resetMap, 60);
+    return;
+  }
+
+  // Synth Radio buttons
+  if (b.id === 'playpausebtn') {
+    toggleRadioPlay();
+    return;
+  }
+  if (b.id === 'nextbtn') {
+    radioIndex = (radioIndex + 1) % radioTracks.length;
+    if (radioPlaying) toggleRadioPlay(true);
+    else updateRadioDom();
+    return;
+  }
+  if (b.id === 'prevbtn') {
+    radioIndex = (radioIndex - 1 + radioTracks.length) % radioTracks.length;
+    if (radioPlaying) toggleRadioPlay(true);
+    else updateRadioDom();
+    return;
+  }
+  if (b.id === 'likebtn') {
+    radioLiked = !radioLiked;
+    updateRadioDom();
+    toast(radioLiked ? `Saved "${radioTracks[radioIndex].title}" to favorites.` : 'Removed from favorites.');
+    return;
+  }
+  if (b.dataset.radioIdx !== undefined) {
+    radioIndex = parseInt(b.dataset.radioIdx, 10);
+    toggleRadioPlay(true);
+    return;
+  }
+
+  // Spot chat starter prompt click
+  if (b.dataset.starterPrompt) {
+    const inp = document.querySelector('#chatinput');
+    if (inp) {
+      inp.value = b.dataset.starterPrompt;
+      inp.focus();
+    }
+    return;
+  }
+  if (b.id === 'chatclose') {
+    const cr = document.querySelector('#chatroom');
+    if (cr) cr.style.display = cr.style.display === 'none' ? '' : 'none';
+    return;
+  }
+  if (b.id === 'chatplace') {
+    placingIdeaMode = !placingIdeaMode;
+    b.classList.toggle('active', placingIdeaMode);
+    b.innerHTML = placingIdeaMode
+      ? 'Click Anywhere on Map to Plant Idea Pin (Esc to Cancel)'
+      : '<svg width="14" height="14" style="vertical-align:-2px;margin-right:4px"><use href="#icon-quill"/></svg> 💬 Drop an Idea on the Map';
+    if (placingIdeaMode) toast('Click any spot on the illustrated island to plant your Idea Dot!');
+    return;
+  }
+  if (b.id === 'fly-spot-btn') {
+    const z = getSpotById(selectedZone);
+    flyTo(z.x / 100, z.y / 100, mapView.fit * 1.65, 650);
+    return;
+  }
 
   // Portal Machine Living App selection
   if (b.dataset.portalApp) {
@@ -896,7 +2175,7 @@ document.addEventListener('click', async e => {
 
   // Campus Map controls
   if (b.dataset.zone) {
-    selectZone(b.dataset.zone);
+    selectZone(b.dataset.zone, true);
     return;
   }
   if (b.id === 'map-plus') {
@@ -911,16 +2190,20 @@ document.addEventListener('click', async e => {
     resetMap();
     return;
   }
-  if (b.dataset.companionMap) {
-    location.hash = 'companions';
-    return;
-  }
   if (b.id === 'enter-zone') {
-    const z = mapZones.find(z => z.id === b.dataset.zoneTarget);
+    const z = getSpotById(b.dataset.zoneTarget);
+    if (z.portalAppId) {
+      activeAppId = z.portalAppId;
+      activeStopIndex = 0;
+      visitedStops.add(`${activeAppId}:0`);
+      logPortalEvent('app_opened', activeAppId);
+      location.hash = 'portal';
+      return;
+    }
     if (z.lesson) {
-      currentLesson = lessons.find(l => l.id === z.lesson);
+      currentLesson = lessons.find(l => l.id === z.lesson) || lessons[0];
       location.hash = 'lab';
-    } else {
+    } else if (z.route) {
       location.hash = z.route;
     }
     return;
@@ -1018,8 +2301,29 @@ document.addEventListener('click', async e => {
   }
 });
 
-// Submit handler for Portal Machine Waitlist Form
+// Submit handler for Portal Machine Waitlist Form AND Map Spot Discussion Thread
 document.addEventListener('submit', async e => {
+  if (e.target.id === 'chatinputrow') {
+    e.preventDefault();
+    const inp = document.querySelector('#chatinput');
+    if (!inp || !inp.value.trim()) return;
+    const text = inp.value.trim();
+    if (!spotChats[selectedZone]) spotChats[selectedZone] = [];
+    spotChats[selectedZone].push({
+      author: 'You (Campus Builder)',
+      time: 'Just now',
+      text
+    });
+    try {
+      localStorage.setItem('rd-map-spot-chats', JSON.stringify(spotChats));
+    } catch {}
+    const spot = getSpotById(selectedZone);
+    const chatRoom = document.querySelector('#chatroom');
+    if (chatRoom) chatRoom.innerHTML = renderSpotChatHtml(spot);
+    toast(`Posted reply to ${spot.name}!`);
+    return;
+  }
+
   if (e.target.id === 'waitlist-form') {
     e.preventDefault();
     const name = document.querySelector('#lead-name').value.trim();
@@ -1054,6 +2358,17 @@ document.addEventListener('submit', async e => {
 });
 
 document.addEventListener('input', e => {
+  if (e.target.id === 'wiki-search-input') {
+    wikiSearch = e.target.value;
+    const host = document.querySelector('#pz-modal-host');
+    if (host) host.innerHTML = renderWikiModalHtml();
+    const inp = document.querySelector('#wiki-search-input');
+    if (inp) {
+      inp.focus();
+      inp.setSelectionRange(wikiSearch.length, wikiSearch.length);
+    }
+    return;
+  }
   if (e.target.id === 'project-note') {
     draft = e.target.value;
     const rev = document.querySelector('#review-area');

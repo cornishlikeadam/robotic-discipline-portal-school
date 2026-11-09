@@ -3,8 +3,9 @@
 TDD test suite for the forked Gamified Portal Machine Story Maps + Robotic Discipline School repo.
 Verifies:
 1. GitHub Pages static bundle (index.html, style.css, app.js, seed-bundle.json, assets/*) uses relative paths for github.io compatibility.
-2. Gamification mechanics from Portal Machine Story Maps (stationary 6-app home screen, chain-reaction domino funnel, 5 Kindred's Waitlist stops, 7 telemetry events) and Robotic Discipline School (interactive pan/zoom map, PATCH/MOSS/PIP companions, Reengineering Lab, human-approved Notebook, Visual White Paper & Blueprint Studio) are present.
-3. Vercel backend (api/index.py) serves static assets and CORS-enabled /api/portal/* endpoints backing the github.io site.
+2. Gamification mechanics from Portal Machine Story Maps (stationary 6-app home screen, chain-reaction domino funnel, 5 Kindred's Waitlist stops, 7 telemetry events), the Three Company Identities infrastructure thesis, and Robotic Discipline School (PATCH/MOSS/PIP companions, Reengineering Lab, human-approved Notebook, Visual White Paper & Blueprint Studio) are preserved.
+3. Reengineered Pizza Ninjas IP School (pizzaninjas.com) x Taproot Wizards Spellverse (spellverse.taprootwizards.com) interactive world map mechanics (#pz-stage, #worldFx, #clouds, #birds Golden-Ratio Fibonacci flocks, .spellverse-leylines, #musichud synth radio, #weekstrip 8-week marquee, #spotcard + #chatguide + #chatroom, physical Z/X/Space/Arrow keycaps, .msgdot idea pins, and #communitymodal / #wikimodal).
+4. Vercel backend (api/index.py) serves static assets and CORS-enabled /api/portal/* endpoints backing the github.io site.
 """
 
 import json
@@ -46,7 +47,7 @@ class TestPortalSchoolFork(unittest.TestCase):
 
     def test_portal_machine_story_maps_and_school_gamification_mechanics(self) -> None:
         app_js = (REPO_ROOT / "app.js").read_text(encoding="utf-8")
-        # 6 Living Apps + Kindred's Waitlist 5 stops
+        # 6 Living Apps + Kindred's Waitlist 5 stops + Three Identities Thesis
         for required in [
             "Portal Machine Story Maps",
             "Kindred's Waitlist",
@@ -70,8 +71,59 @@ class TestPortalSchoolFork(unittest.TestCase):
             "MOSS",
             "PIP",
             "contenteditable",
+            "Vertically Integrated Food Recovery Infrastructure",
+            "Vertically Integrated Companion & Memory Infrastructure",
         ]:
             self.assertIn(required, app_js, f"Missing '{required}' in app.js")
+
+    def test_pizzaninjas_and_spellverse_reengineered_world_map(self) -> None:
+        """Verifies Pizza Ninjas IP School & Taproot Wizards Spellverse map architecture."""
+        index_html = (REPO_ROOT / "index.html").read_text(encoding="utf-8")
+        style_css = (REPO_ROOT / "style.css").read_text(encoding="utf-8")
+        app_js = (REPO_ROOT / "app.js").read_text(encoding="utf-8")
+
+        for svg_symbol in [
+            "metric-contributions",
+            "metric-ideas",
+            "metric-replies",
+            "metric-wiki",
+            "icon-quill",
+        ]:
+            self.assertIn(svg_symbol, index_html)
+
+        for css_feature in [
+            "#pz-stage",
+            "#worldFx",
+            "#clouds",
+            "#birds",
+            ".spellverse-leylines",
+            "#musichud",
+            "#weekstrip",
+            "#spotcard",
+            "#chatroom",
+            "#chatguide",
+            "#blhud",
+            "#spacehud",
+            "#panhud",
+            "#kspace",
+            ".msgdot",
+        ]:
+            self.assertIn(css_feature, style_css, f"Missing '{css_feature}' in style.css")
+
+        for js_feature in [
+            "flyTo",
+            "teleportNextSpot",
+            "startFibonacciBirds",
+            "updateChatGuideLine",
+            "chatguidepath",
+            "communitymodal",
+            "wikimodal",
+            "Drop an Idea on the Map",
+            "SPACE — TELEPORT",
+            "Zoom with Z and X",
+            "Navigate with arrow keys",
+        ]:
+            self.assertIn(js_feature, app_js, f"Missing '{js_feature}' in app.js")
 
     def test_vercel_backend_cors_and_portal_api(self) -> None:
         from api.index import route_request
