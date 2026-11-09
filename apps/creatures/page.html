@@ -1,0 +1,381 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex">
+<title>__CREATURE_NAME__ · Madken</title>
+<style>
+@font-face{font-family:Barlow;src:url('/assets/BarlowCondensed-Bold.ttf') format('truetype');font-weight:700;font-display:swap}
+:root{
+  --paper:#EFE6D4; --paper-2:#E6DBC4; --ink:#141413; --muted:#5f584c; --line:rgba(20,20,19,.16);
+  --lime:#D8FF3E; --blush:#FF5E8E; --mono:"Courier New",ui-monospace,monospace;
+  --sans:"Helvetica Neue",Arial,sans-serif; --display:Barlow,"Arial Narrow",sans-serif;
+  color-scheme:light;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--paper);color:var(--ink)}
+body{font:16px/1.5 var(--sans);-webkit-font-smoothing:antialiased;padding-bottom:env(safe-area-inset-bottom)}
+button,input,textarea{font:inherit;color:inherit}
+a{color:inherit}
+.wrap{max-width:1080px;margin:0 auto;padding:20px 16px 48px}
+.kicker,.label,.fine,.cat{font-family:var(--mono);font-size:12px;letter-spacing:.06em;text-transform:uppercase}
+.kicker{display:flex;justify-content:space-between;gap:12px;border-bottom:2px solid var(--ink);padding-bottom:8px}
+.mast h1{font:700 clamp(56px,16vw,120px)/.92 var(--display);letter-spacing:-.01em;text-transform:uppercase;margin:18px 0 14px;overflow-wrap:anywhere}
+.mast h1 mark{display:inline-block;line-height:.92;background:var(--lime);color:var(--ink);padding:.06em .08em 0}
+.lore{max-width:60ch;font-size:17px;margin:0 0 14px}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:22px}
+.chip{font-family:var(--mono);font-size:11px;text-transform:uppercase;border:1px solid var(--ink);padding:3px 8px;border-radius:999px}
+.card{border:2px solid var(--ink);background:#F6F0E3;padding:16px;margin-bottom:16px}
+.card h2{font:700 30px/1 var(--display);text-transform:uppercase;margin:0 0 12px}
+.card h3{font-family:var(--mono);font-size:12px;text-transform:uppercase;letter-spacing:.06em;margin:16px 0 8px;color:var(--muted)}
+.notice{border-left:6px solid var(--blush);background:#fff6ee;padding:10px 12px;margin-bottom:12px;font-size:14px}
+.notice.calm{border-left-color:var(--ink);background:#F6F0E3}
+.btn{appearance:none;border:2px solid var(--ink);background:var(--ink);color:var(--paper);padding:10px 16px;font-weight:700;cursor:pointer;min-height:44px}
+.btn.ghost{background:transparent;color:var(--ink)}
+.btn.lime{background:var(--lime);color:var(--ink)}
+.btn.small{padding:6px 10px;min-height:36px;font-size:14px}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.btn:focus-visible,input:focus-visible,textarea:focus-visible{outline:3px solid var(--blush);outline-offset:2px}
+.field{display:block;margin:10px 0}
+.field input,.field textarea,textarea.memo{width:100%;border:2px solid var(--ink);background:#fffdf7;padding:10px 12px;min-height:44px;border-radius:0}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.grid{display:grid;gap:16px}
+@media (min-width:860px){.grid{grid-template-columns:minmax(0,1.5fr) minmax(0,1fr)}}
+.log{display:flex;flex-direction:column;gap:10px;max-height:56vh;min-height:160px;overflow-y:auto;padding:4px 2px 8px}
+.bubble{max-width:88%;padding:10px 12px;white-space:pre-wrap;overflow-wrap:anywhere}
+.bubble.human{align-self:flex-end;background:var(--ink);color:var(--paper)}
+.bubble.creature{align-self:flex-start;background:#fffdf7;border:1px solid var(--line)}
+.bubble .who{display:block;font-family:var(--mono);font-size:11px;text-transform:uppercase;opacity:.65;margin-bottom:2px}
+.empty{color:var(--muted);font-size:14px}
+.asks{border:2px dashed var(--ink);padding:10px 12px;margin:10px 0;background:#fffbe6}
+.mem{list-style:none;margin:0;padding:0}
+.mem li{border-top:1px solid var(--line);padding:10px 0}
+.mem li:first-child{border-top:0}
+.mem p{margin:4px 0 8px}
+.cat{display:inline-block;background:var(--lime);padding:1px 6px;font-size:11px}
+.chatform{display:flex;gap:8px;align-items:flex-end;margin-top:8px}
+.chatform textarea{flex:1;min-height:48px;max-height:160px;resize:vertical;border:2px solid var(--ink);background:#fffdf7;padding:10px 12px}
+dl{display:grid;grid-template-columns:auto 1fr;gap:6px 12px;margin:0 0 14px;font-size:14px}
+dt{font-family:var(--mono);font-size:11px;text-transform:uppercase;color:var(--muted);padding-top:2px}
+dd{margin:0;overflow-wrap:anywhere}
+.fine{color:var(--muted);text-transform:none;letter-spacing:0;font-size:12px}
+footer{border-top:2px solid var(--ink);margin-top:24px;padding-top:10px}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+.err{color:#9b1238;font-size:14px;min-height:1.2em}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="mast">
+    <div class="kicker"><span>Madken · Animal Scrypt</span><span id="tagid"></span></div>
+    <h1 id="name"><mark>__CREATURE_NAME__</mark></h1>
+    <p class="lore" id="lore"></p>
+    <div class="chips" id="chips"></div>
+  </header>
+  <main id="main" aria-live="polite"><p class="empty">Loading…</p></main>
+  <footer class="fine">Robotic Discipline. Your creature only carries what you choose to keep.</footer>
+</div>
+<script>
+const ID = __CREATURE_ID_JSON__;
+const $ = (s, el = document) => el.querySelector(s);
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+let cfg = null, sb = null, profile = null, state = null, sending = false;
+
+function loadScript(src) {
+  return new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = src; s.onload = resolve; s.onerror = () => reject(new Error('Could not load sign-in library.'));
+    document.head.appendChild(s);
+  });
+}
+function devToken() { try { return localStorage.getItem('creature_dev_token'); } catch (e) { return null; } }
+async function token() {
+  if (cfg && cfg.auth_mode === 'supabase' && sb) {
+    const { data } = await sb.auth.getSession();
+    return data.session ? data.session.access_token : null;
+  }
+  if (cfg && cfg.auth_mode === 'dev') return devToken();
+  return null;
+}
+async function api(path, opts = {}) {
+  const t = await token();
+  const headers = { 'Content-Type': 'application/json' };
+  if (t) headers.Authorization = 'Bearer ' + t;
+  const res = await fetch(path, { ...opts, headers });
+  let data = {};
+  try { data = await res.json(); } catch (e) {}
+  if (!res.ok) { const err = new Error(data.message || ('Request failed (' + res.status + ')')); err.status = res.status; throw err; }
+  return data;
+}
+function fmtDate(iso) {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  return isNaN(d) ? iso : d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+}
+
+function renderHeader(p) {
+  $('#name').innerHTML = '<mark>' + esc(p.name) + '</mark>';
+  document.title = p.name + ' · Madken';
+  $('#lore').textContent = p.authored_lore;
+  $('#tagid').textContent = 'Tag ' + p.id;
+  const spec = p.chassis_spec || {};
+  const chips = [];
+  if (spec.translucent_tint) chips.push(spec.translucent_tint);
+  if (spec.progression_stage) chips.push('Stage ' + spec.progression_stage);
+  chips.push(p.claimed ? 'Claimed' : 'Unclaimed');
+  $('#chips').innerHTML = chips.map((c) => '<span class="chip">' + esc(String(c).trim()) + '</span>').join('');
+}
+
+function main(html) { $('#main').innerHTML = html; }
+function renderMessage(title, body) {
+  main('<section class="card"><h2>' + esc(title) + '</h2><p>' + esc(body) + '</p></section>');
+}
+
+async function signOut() {
+  if (cfg.auth_mode === 'supabase' && sb) await sb.auth.signOut();
+  if (cfg.auth_mode === 'dev') { try { localStorage.removeItem('creature_dev_token'); } catch (e) {} }
+  load();
+}
+function signedInLine() {
+  return '<p class="fine">Signed in as ' + esc(profile.viewer_email || 'you') +
+    ' · <a href="#" id="signout">Sign out</a></p>';
+}
+function bindSignOut() { const a = $('#signout'); if (a) a.onclick = (e) => { e.preventDefault(); signOut(); }; }
+
+function renderSignIn() {
+  const lead = profile.claimed
+    ? profile.name + ' already has an owner. If that’s you, sign in.'
+    : 'Found ' + profile.name + '? Sign in, then enter the claim code that came with it.';
+  if (cfg.auth_mode === 'off') return renderMessage('Sign-in isn’t set up yet', 'This deployment has no sign-in configured. Ask the studio to finish setup.');
+  if (cfg.auth_mode === 'dev') {
+    const demo = cfg.dev_demo && cfg.dev_demo.id === ID ? '<p class="fine">Local demo claim code: <strong>' + esc(cfg.dev_demo.code) + '</strong></p>' : '';
+    main('<section class="card"><h2>Sign in</h2><p>' + esc(lead) + '</p>' +
+      '<p class="notice calm">Local dev sign-in. This only works on your own machine, never on the live site.</p>' +
+      '<form id="devform"><label class="field"><span class="label">Pick a name</span><input id="handle" autocomplete="off" required maxlength="40" placeholder="kj"></label>' +
+      '<button class="btn" type="submit">Sign in</button></form>' + demo + '</section>');
+    $('#devform').onsubmit = (e) => {
+      e.preventDefault();
+      const h = $('#handle').value.trim().toLowerCase().replace(/[^a-z0-9._-]/g, '');
+      if (!h) return;
+      try { localStorage.setItem('creature_dev_token', 'dev:' + h); } catch (err) {}
+      load();
+    };
+    return;
+  }
+  main('<section class="card"><h2>Sign in</h2><p>' + esc(lead) + '</p>' +
+    '<form id="emailform"><label class="field"><span class="label">Email</span><input id="email" type="email" autocomplete="email" required></label>' +
+    '<button class="btn" type="submit" id="sendlink">Email me a sign-in link</button><p class="err" id="err"></p></form>' +
+    '<form id="codeform" hidden><p>Check your email. Tap the link on this device, or type the code from the email.</p>' +
+    '<label class="field"><span class="label">Code</span><input id="otp" inputmode="numeric" autocomplete="one-time-code" maxlength="10"></label>' +
+    '<button class="btn" type="submit">Sign in with code</button> <button class="btn ghost" type="button" id="restart">Use a different email</button><p class="err" id="err2"></p></form></section>');
+  let email = '';
+  $('#emailform').onsubmit = async (e) => {
+    e.preventDefault();
+    email = $('#email').value.trim();
+    $('#sendlink').disabled = true; $('#err').textContent = '';
+    const { error } = await sb.auth.signInWithOtp({ email, options: { emailRedirectTo: location.origin + location.pathname } });
+    $('#sendlink').disabled = false;
+    if (error) { $('#err').textContent = error.message; return; }
+    $('#emailform').hidden = true; $('#codeform').hidden = false; $('#otp').focus();
+  };
+  $('#codeform').onsubmit = async (e) => {
+    e.preventDefault();
+    const { error } = await sb.auth.verifyOtp({ email, token: $('#otp').value.trim(), type: 'email' });
+    if (error) { $('#err2').textContent = error.message; return; }
+    load();
+  };
+  $('#restart').onclick = () => { $('#codeform').hidden = true; $('#emailform').hidden = false; };
+}
+
+function renderClaim() {
+  main('<section class="card"><h2>Claim ' + esc(profile.name) + '</h2>' +
+    '<p>Enter the claim code printed with this creature. Once claimed, only you can talk to it and see what it remembers.</p>' +
+    '<form id="claimform"><label class="field"><span class="label">Claim code</span><input id="code" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="XXXX-XXXX-XXXX" required maxlength="20"></label>' +
+    '<button class="btn lime" type="submit" id="claimbtn">Claim</button><p class="err" id="err"></p></form>' + signedInLine() + '</section>');
+  bindSignOut();
+  $('#claimform').onsubmit = async (e) => {
+    e.preventDefault();
+    $('#claimbtn').disabled = true; $('#err').textContent = '';
+    try { await api('/api/c/' + ID + '/claim', { method: 'POST', body: JSON.stringify({ code: $('#code').value }) }); load(); }
+    catch (err) { $('#err').textContent = err.message; $('#claimbtn').disabled = false; }
+  };
+}
+
+function renderOther() {
+  main('<section class="card"><h2>Already claimed</h2><p>' + esc(profile.name) +
+    ' belongs to someone else, so its conversations and memories are private.</p>' + signedInLine() + '</section>');
+  bindSignOut();
+}
+
+/* ---------- owner workspace ---------- */
+function renderWorkspace() {
+  const notices = [];
+  if (!state.storage_is_durable) notices.push('<p class="notice">Storage on this deployment is temporary, so memories won’t survive a restart. Connect Supabase (DATABASE_URL) before running the 7-day test.</p>');
+  if (state.model_mode === 'offline') notices.push('<p class="notice calm">Offline demo mode: no AI model is connected, so replies are scripted. Try “remember that …”.</p>');
+  main(notices.join('') +
+    '<div class="grid">' +
+      '<section class="card" aria-labelledby="talk-h"><h2 id="talk-h">Talk</h2>' +
+        '<div class="log" id="log" role="log" aria-label="Conversation"></div>' +
+        '<div id="asks"></div>' +
+        '<form class="chatform" id="chatform"><label class="sr" for="msg">Message</label>' +
+          '<textarea id="msg" rows="2" maxlength="2000" placeholder="Say something to ' + esc(profile.name) + '…"></textarea>' +
+          '<button class="btn" id="send" type="submit">Send</button></form>' +
+        '<p class="err" id="chaterr"></p>' +
+        '<p class="fine">' + esc(profile.name) + ' remembers this conversation for a few hours. Across days it only carries what you keep.</p>' +
+      '</section>' +
+      '<div>' +
+        '<section class="card" aria-labelledby="kept-h"><h2 id="kept-h">Kept memories</h2><ul class="mem" id="kept"></ul></section>' +
+        '<section class="card" aria-labelledby="pair-h"><h2 id="pair-h">Pairing record</h2><dl id="pairing"></dl>' +
+          '<div class="row"><button class="btn small" id="export" type="button">Export identity</button>' +
+          '<button class="btn small ghost" id="clear" type="button">Clear conversation</button></div>' +
+          signedInLine() + '</section>' +
+      '</div>' +
+    '</div>');
+  bindSignOut();
+  $('#chatform').onsubmit = (e) => { e.preventDefault(); send(); };
+  $('#msg').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey && !matchMedia('(pointer: coarse)').matches) { e.preventDefault(); send(); }
+  });
+  $('#export').onclick = exportIdentity;
+  $('#clear').onclick = clearConversation;
+  $('#asks').addEventListener('click', onMemoryAction);
+  $('#kept').addEventListener('click', onMemoryAction);
+  paint();
+}
+
+function bubble(role, text) {
+  const who = role === 'human' ? 'You' : profile.name;
+  return '<div class="bubble ' + role + '"><span class="who">' + esc(who) + '</span>' + esc(text) + '</div>';
+}
+function memoryItem(m, pending) {
+  const actions = pending
+    ? '<button class="btn small lime" data-act="keep" data-id="' + esc(m.id) + '">Keep</button>' +
+      '<button class="btn small ghost" data-act="edit" data-id="' + esc(m.id) + '">Edit</button>' +
+      '<button class="btn small ghost" data-act="drop" data-id="' + esc(m.id) + '">Not this</button>'
+    : '<button class="btn small ghost" data-act="forget" data-id="' + esc(m.id) + '">Forget</button>';
+  return '<li data-mem="' + esc(m.id) + '"><span class="cat">' + esc(m.category) + '</span><p class="mem-text">' + esc(m.content) + '</p><div class="row">' + actions + '</div></li>';
+}
+function paint() {
+  const log = $('#log');
+  log.innerHTML = state.messages.length
+    ? state.messages.map((m) => bubble(m.role, m.content)).join('')
+    : '<p class="empty">No conversation yet. Say hi, or tell ' + esc(profile.name) + ' what you’re working on.</p>';
+  log.scrollTop = log.scrollHeight;
+  $('#asks').innerHTML = state.proposed.length
+    ? '<div class="asks"><span class="label">' + esc(profile.name) + ' asked to keep</span><ul class="mem">' + state.proposed.map((m) => memoryItem(m, true)).join('') + '</ul></div>'
+    : '';
+  $('#kept').innerHTML = state.approved.length
+    ? state.approved.map((m) => memoryItem(m, false)).join('')
+    : '<li class="empty">Nothing kept yet. When ' + esc(profile.name) + ' asks to remember something, you decide.</li>';
+  $('#kept-h').textContent = 'Kept memories (' + state.approved.length + ')';
+  const p = state.pairing;
+  $('#pairing').innerHTML =
+    '<dt>Owner</dt><dd>' + esc(p.owner_email || 'you') + '</dd>' +
+    '<dt>Claimed</dt><dd>' + esc(fmtDate(p.claimed_at)) + '</dd>' +
+    '<dt>Tag URL</dt><dd>' + esc(location.origin + p.tag_path) + '</dd>' +
+    '<dt>Model</dt><dd>' + esc(state.model_mode) + '</dd>' +
+    '<dt>Storage</dt><dd>' + esc(state.storage) + (state.storage_is_durable ? '' : ' (not durable)') + '</dd>';
+}
+async function refresh() { state = await api('/api/c/' + ID + '/state'); paint(); }
+
+async function send() {
+  const box = $('#msg');
+  const text = box.value.trim();
+  if (!text || sending) return;
+  sending = true; $('#send').disabled = true; $('#chaterr').textContent = '';
+  state.messages.push({ role: 'human', content: text });
+  state.messages.push({ role: 'creature', content: '…' });
+  paint(); box.value = '';
+  try {
+    await api('/api/c/' + ID + '/chat', { method: 'POST', body: JSON.stringify({ message: text }) });
+    await refresh();
+  } catch (err) {
+    state.messages.splice(-2, 2); paint(); box.value = text;
+    $('#chaterr').textContent = err.message;
+  } finally { sending = false; $('#send').disabled = false; box.focus(); }
+}
+
+async function review(id, approve, updated) {
+  const body = { memory_id: id, approve };
+  if (updated !== undefined) body.updated_content = updated;
+  await api('/api/c/' + ID + '/memory/review', { method: 'POST', body: JSON.stringify(body) });
+  await refresh();
+}
+async function onMemoryAction(e) {
+  const btn = e.target.closest('button[data-act]');
+  if (!btn) return;
+  const id = btn.dataset.id, act = btn.dataset.act;
+  try {
+    if (act === 'keep') return await review(id, true);
+    if (act === 'drop') return await review(id, false);
+    if (act === 'forget') { if (confirm('Forget this memory? ' + profile.name + ' won’t carry it anymore.')) await review(id, false); return; }
+    if (act === 'edit') {
+      const li = btn.closest('li');
+      const current = $('.mem-text', li).textContent;
+      li.querySelector('.row').innerHTML = '';
+      $('.mem-text', li).outerHTML = '<textarea class="memo" maxlength="280" aria-label="Edit memory">' + esc(current) + '</textarea>';
+      li.querySelector('.row').innerHTML = '<button class="btn small lime" data-act="save" data-id="' + esc(id) + '">Save &amp; keep</button><button class="btn small ghost" data-act="cancel">Cancel</button>';
+      $('textarea', li).focus();
+      return;
+    }
+    if (act === 'save') { const li = btn.closest('li'); return await review(id, true, $('textarea', li).value.trim()); }
+    if (act === 'cancel') return paint();
+  } catch (err) { $('#chaterr').textContent = err.message; }
+}
+
+async function exportIdentity() {
+  const t = await token();
+  const res = await fetch('/api/c/' + ID + '/export', { headers: t ? { Authorization: 'Bearer ' + t } : {} });
+  if (!res.ok) { $('#chaterr').textContent = 'Export failed.'; return; }
+  const blob = await res.blob();
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = ID + '-identity.json';
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+}
+async function clearConversation() {
+  if (!confirm('Delete the conversation log? Kept memories stay.')) return;
+  try { await api('/api/c/' + ID + '/messages/clear', { method: 'POST', body: '{}' }); await refresh(); }
+  catch (err) { $('#chaterr').textContent = err.message; }
+}
+
+/* ---------- boot ---------- */
+async function load() {
+  try { profile = await api('/api/c/' + ID + '/profile'); }
+  catch (err) {
+    if (err.status === 404) return renderMessage('Unknown tag', 'There’s no creature at this address. Check the tag or QR code.');
+    return renderMessage('Something went wrong', err.message);
+  }
+  renderHeader(profile);
+  if (profile.relation === 'owner') {
+    try { state = await api('/api/c/' + ID + '/state'); return renderWorkspace(); }
+    catch (err) { return renderMessage('Something went wrong', err.message); }
+  }
+  if (!profile.signed_in) return renderSignIn();
+  if (profile.relation === 'unclaimed') return renderClaim();
+  if (profile.relation === 'untagged') return renderMessage('Not ready yet', 'This creature doesn’t have a tag yet.');
+  return renderOther();
+}
+async function boot() {
+  try { cfg = await api('/api/creature-config'); }
+  catch (err) { return renderMessage('Can’t reach the server', 'Check your connection and reload.'); }
+  if (cfg.auth_mode === 'supabase') {
+    try {
+      await loadScript('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2');
+      sb = window.supabase.createClient(cfg.supabase_url, cfg.supabase_anon_key);
+      const { data } = await sb.auth.getSession();
+      let seenUser = data.session ? data.session.user.id : null;
+      // Reload only when the signed-in person actually changes (not on focus/refresh events).
+      sb.auth.onAuthStateChange((evt, session) => {
+        const uid = session ? session.user.id : null;
+        if (uid !== seenUser) { seenUser = uid; setTimeout(load, 0); }
+      });
+    } catch (err) { return renderMessage('Sign-in unavailable', err.message); }
+  }
+  load();
+}
+boot();
+</script>
+</body>
+</html>

@@ -68,3 +68,28 @@ CREATE TABLE IF NOT EXISTS royalty_ledger (
     settlement_mode TEXT NOT NULL DEFAULT 'SIMULATED_TEST_LEDGER',
     created_at TEXT NOT NULL
 );
+
+-- Tag pairing: one physical tag (QR / NFC URL) per creature. The claim code is
+-- printed with the shell; only its hash is stored. Unclaimed while claimed_by IS NULL.
+CREATE TABLE IF NOT EXISTS tag_claims (
+    companion_id TEXT PRIMARY KEY REFERENCES companions(id) ON DELETE CASCADE,
+    claim_code_hash TEXT NOT NULL,
+    claimed_by TEXT,
+    claimed_at TEXT,
+    created_at TEXT NOT NULL
+);
+
+-- Conversation log shown in the owner's workspace. Only recent same-session
+-- messages are sent back to the model; facts carry across days only through
+-- APPROVED memory_records.
+CREATE TABLE IF NOT EXISTS messages (
+    id TEXT PRIMARY KEY,
+    companion_id TEXT NOT NULL REFERENCES companions(id) ON DELETE CASCADE,
+    owner_id TEXT NOT NULL,
+    role TEXT NOT NULL CHECK (role IN ('human', 'creature')),
+    content TEXT NOT NULL,
+    created_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_messages_companion ON messages (companion_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_memory_companion ON memory_records (companion_id, status);

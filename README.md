@@ -20,6 +20,7 @@
   * **[Interactive Creature Workspace (`/workspace`)](https://robotic-discipline-portal-school.vercel.app/workspace)**
   * **[Self-Hosted Investor Data Room (`/dataroom`)](https://robotic-discipline-portal-school.vercel.app/dataroom)**
   * **[Open-Source VC Tools Directory (`/directory`)](https://robotic-discipline-portal-school.vercel.app/directory)**
+  * **Creature Tag Pages (`/c/<id>`)** — What a creature's QR code / NFC tag opens: claim with a printed code, talk to it, and keep only the memories you approve. Setup and the 3-adult test protocol: [`CREATURE-SETUP.md`](./CREATURE-SETUP.md).
 
 ---
 

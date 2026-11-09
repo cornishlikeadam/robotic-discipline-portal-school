@@ -1078,7 +1078,7 @@ function renderCommunityModalHtml() {
   const totalReplies = Object.values(spotChats).reduce((acc, arr) => acc + arr.length, 0);
   const weeks = [
     ['Week 1', 'Paper Machines & Translucent Shell Form', 'COMPLETE', '100%'],
-    ['Week 2', 'NTAG215 NFC Cryptographic Binding & Identity', 'COMPLETE', '100%'],
+    ['Week 2', 'NFC/QR Tag Page & Owner Claim (signed tags later)', 'BUILT, UNTESTED ON A SHELL', 'software only'],
     ['Week 3', '7-Day Human-Approved Memory Ledger', 'ACTIVE NOW', '78%'],
     ['Week 4', '20% Single-Hop Creator Royalty Settlement', 'UP NEXT', '45%'],
     ['Week 5', 'Portal Machine 5-Stop Causeway Funnels', 'IN PROGRESS', '85%'],
