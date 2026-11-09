@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#141416">
+  <meta name="description" content="Robotic Discipline × Animal Scrypt × Portal Machine Story Maps — Interactive Living Worlds, School Map, Reengineering Lab, and Visual Blueprint & White Paper Studio.">
+  <title>Robotic Discipline — Portal Machine Story Maps &amp; School</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <a class="skip" href="#main">Skip to content</a>
+  <aside class="sidebar">
+    <a href="#portal" class="brand" aria-label="Robotic Discipline Portal &amp; School home">
+      <svg viewBox="0 0 60 45" aria-hidden="true"><path d="M40 7C7-6-8 37 28 38c12 0 20-5 22-13"/><rect x="42" y="2" width="12" height="12"/></svg>
+      <span>ROBOTIC<br>DISCIPLINE<span class="brand-school">PORTAL &times; SCHOOL</span></span>
+    </a>
+    <p class="side-intro">Living-world story maps,<br>curious minds &amp; useful machines.</p>
+
+    <!-- Gamification Quest Progress HUD -->
+    <div class="quest-hud" aria-label="Your exploration progress">
+      <div class="quest-hud-top">
+        <span>QUEST LOG</span>
+        <strong id="quest-xp">0 / 4 BADGES</strong>
+      </div>
+      <div class="quest-bar"><div id="quest-fill" class="quest-fill" style="width:8%"></div></div>
+      <div id="quest-badges" class="quest-badges"></div>
+    </div>
+
+    <nav aria-label="Main navigation">
+      <a href="#portal" data-route="portal"><span>★ Portal Machine Maps</span><span aria-hidden="true">↗</span></a>
+      <a href="#map" data-route="map"><span>Explore campus map</span><span aria-hidden="true">↗</span></a>
+      <a href="#blueprint" data-route="blueprint"><span>★ White Paper &amp; Blueprint</span><span aria-hidden="true">↗</span></a>
+      <a href="#school" data-route="school"><span>School exercises</span><span aria-hidden="true">↗</span></a>
+      <a href="#lab" data-route="lab"><span>Reengineering lab</span><span aria-hidden="true">↗</span></a>
+      <a href="#companions" data-route="companions"><span>Companions</span><span aria-hidden="true">↗</span></a>
+      <a href="#studio" data-route="studio"><span>Concept studio</span><span aria-hidden="true">↗</span></a>
+      <a href="#notebook" data-route="notebook"><span>Your notebook</span><span id="note-count">0</span></a>
+      <a href="#dataroom" data-route="dataroom"><span>Investor Data Room</span><span aria-hidden="true">↗</span></a>
+      <a href="#directory" data-route="directory"><span>VC Tools Directory</span><span aria-hidden="true">↗</span></a>
+    </nav>
+    <div class="side-bottom">
+      <div class="mini-mark">RD.</div>
+      <p>Think with your hands.<br>Keep your own say.</p>
+      <a href="#about">About the project ↗</a>
+      <span class="edition">PORTAL MACHINE &times; ANIMAL SCRYPT EDITION</span>
+    </div>
+  </aside>
+
+  <div class="shell">
+    <header class="topbar">
+      <button class="menu-button" aria-expanded="false" aria-controls="mobile-nav">Menu</button>
+      <span>HOME SCREEN &rarr; LIVING WORLDS &rarr; STAGED FUNNELS &rarr; CONVERSION</span>
+      <div style="display:flex;gap:14px;align-items:center;">
+        <a href="#portal">Portal Machine ↗</a>
+        <a href="#map">Campus Map ↗</a>
+        <a href="#blueprint">White Paper &amp; Visual Studio ↗</a>
+      </div>
+    </header>
+    <nav id="mobile-nav" class="mobile-nav" aria-label="Mobile navigation" hidden>
+      <a href="#portal">★ Portal Machine Story Maps</a>
+      <a href="#map">Explore campus map</a>
+      <a href="#blueprint">★ White Paper &amp; Blueprint Studio</a>
+      <a href="#school">School exercises</a>
+      <a href="#lab">Reengineering lab</a>
+      <a href="#companions">Companions</a>
+      <a href="#studio">Concept studio</a>
+      <a href="#notebook">Notebook</a>
+      <a href="#dataroom">Investor Data Room</a>
+      <a href="#directory">VC Tools Directory</a>
+    </nav>
+    <main id="main" tabindex="-1"></main>
+    <footer>
+      <a class="footer-brand" href="#portal">ROBOTIC DISCIPLINE &times; ANIMAL SCRYPT.</a>
+      <p>Make something. Learn something. Keep your say. Backed by Vercel + GitHub Pages.</p>
+      <a href="#about">Project &amp; privacy</a>
+    </footer>
+  </div>
+  <div class="toast" role="status" aria-live="polite"></div>
+</body>
+</html>
