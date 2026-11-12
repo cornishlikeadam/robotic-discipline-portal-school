@@ -87,7 +87,9 @@ class RouteBase(unittest.TestCase):
 class ChannelRouteTests(RouteBase):
     def test_list_and_create(self):
         status, channels = self.call("GET", f"/api/os/w/{self.ws}/channels")
-        self.assertEqual((status, [c["name"] for c in channels]), (200, ["general"]))
+        # Setup also opens the DM with PATCH, where the evening journal prompt is posted.
+        self.assertEqual((status, [(c["type"], c.get("dm_with", {}).get("name")) if c["type"] == "dm" else c["name"]
+                                   for c in channels]), (200, ["general", ("dm", "PATCH")]))
         status, ch = self.call("POST", f"/api/os/w/{self.ws}/channels",
                                {"name": "Build Log", "type": "private", "description": "notes",
                                 "agent_ids": [self.patch["id"]]})

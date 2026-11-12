@@ -67,6 +67,7 @@
 .hx-meta time { font: 12px var(--mono); color: var(--text-dim); }
 .chip.agent { background: var(--cyan); color: #000; }
 .chip.stub { background: transparent; color: var(--text-dim); border: 1px dashed var(--steel); }
+.chip.model { display: inline-block; text-transform: none; background: transparent; color: var(--cyan); border: 1px solid var(--cyan); max-width: 22ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .hx-text { margin: 2px 0 0; overflow-wrap: anywhere; }
 .hx-ctx { margin: 4px 0 0; font: 12px var(--mono); color: var(--text-dim); overflow-wrap: anywhere; }
 .mention { color: var(--cyan); background: rgba(92, 225, 230, .14); padding: 0 3px; border-radius: 2px; font-weight: 700; }
@@ -156,3 +157,20 @@ dialog .hx-members small, dialog .hx-pick small { color: #555; }
   .hx-msgs { padding: 10px; }
   .apv dl { grid-template-columns: minmax(0, 1fr); gap: 0; }
 }
+
+/* ---------- automations (sidebar + dialog) ---------- */
+.hx-auto {
+  display: flex; align-items: center; gap: 10px; width: 100%; padding: 6px 8px; border: 0; border-radius: 8px;
+  background: transparent; color: var(--text); text-align: left; cursor: pointer; font: inherit;
+}
+.hx-auto:hover { background: var(--ink-3); }
+.hx-auto .ic { width: 28px; height: 28px; flex: none; display: grid; place-items: center; border-radius: 8px;
+  background: rgba(232, 197, 71, .14); font-size: 15px; }
+.hx-auto b { display: block; line-height: 1.2; }
+.hx-auto small { font: 11px var(--mono); color: var(--text-dim); }
+.hx-auto.off .ic { filter: grayscale(1); opacity: .55; }
+.hx-auto.off b { color: var(--text-dim); }
+.hx-auto-meta .err { color: var(--pink); }
+#hx-dialog .toolbar .grow { flex: 1; }
+#hx-dialog p.muted { color: #4a4458; }
+#hx-dialog .hx-auto-meta .err { color: #b3123f; }

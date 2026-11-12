@@ -1,0 +1,50 @@
+{
+  "dependencies": "node_modules",
+  "modelScripts": ["model.js"],
+  "drawings": [{
+    "id": "patch-companion",
+    "title": "PATCH companion robot",
+    "description": "Concept teardown of the PATCH companion device. Proportions follow the concept renders (about 198 × 120 × 90 mm with ears down); internals are illustrative, not engineered.",
+    "concept": true,
+    "parts": [
+      {"id": "head_front", "name": "Head front shell"},
+      {"id": "face", "name": "Face display"},
+      {"id": "blush", "name": "Blush LED"},
+      {"id": "head_back", "name": "Head rear shell"},
+      {"id": "ear_l", "name": "Left ear"},
+      {"id": "earled_l", "name": "Left ear LED panel"},
+      {"id": "ear_r", "name": "Right ear"},
+      {"id": "earled_r", "name": "Right ear LED panel"},
+      {"id": "mic_l", "name": "Left microphone pod"},
+      {"id": "mic_r", "name": "Right microphone pod"},
+      {"id": "camera", "name": "AI camera module"},
+      {"id": "speaker", "name": "Speaker"},
+      {"id": "collar", "name": "Neck collar"},
+      {"id": "chest_front", "name": "Chest front shell"},
+      {"id": "status_ring", "name": "Status light ring"},
+      {"id": "chest_back", "name": "Chest rear shell"},
+      {"id": "board", "name": "AI processor board (NPU)"},
+      {"id": "battery", "name": "Battery pack"},
+      {"id": "servo_l", "name": "Left shoulder servo"},
+      {"id": "servo_r", "name": "Right shoulder servo"},
+      {"id": "arm_l", "name": "Left arm"},
+      {"id": "arm_r", "name": "Right arm"},
+      {"id": "leg_l", "name": "Left hip servo & leg"},
+      {"id": "leg_r", "name": "Right hip servo & leg"},
+      {"id": "foot_l", "name": "Left foot"},
+      {"id": "foot_r", "name": "Right foot"},
+      {"id": "sole_l", "name": "Left sole"},
+      {"id": "sole_r", "name": "Right sole"},
+      {"id": "dock", "name": "Charging dock"}
+    ],
+    "parameters": [
+      {"key": "earTilt", "label": "Ear tilt", "min": 0, "max": 35, "default": 6, "step": 1, "unit": "°"},
+      {"key": "armWave", "label": "Left arm wave", "min": 0, "max": 70, "default": 0, "step": 1, "unit": "°"},
+      {"key": "batteryMah", "label": "Battery capacity", "min": 3000, "max": 4000, "default": 3500, "step": 250, "unit": "mAh"}
+    ],
+    "colors": {
+      "hues": {"earled_l": 118, "earled_r": 118, "blush": 350, "status_ring": 118},
+      "fills": ["earled_l", "earled_r", "blush"]
+    }
+  }]
+}

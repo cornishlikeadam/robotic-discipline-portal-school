@@ -8,3 +8,7 @@ __pycache__/
 .vercel
 data/
 demo-output/
+node_modules/
+device/proof/
+device/check/
+device/check-dark/

@@ -21,13 +21,24 @@ Options: `--db path/to/file.db` picks a different database, and `--host 0.0.0.0`
 
 Python 3.10+ standard library only. No pip install is needed to run it.
 
+### Connect a model (optional)
+
+Agents answer with a rule-based stand-in until you give the server a model. Any OpenAI-compatible provider works; the free default is OpenRouter's free router:
+
+```bash
+export JOURNAL_OS_LLM_API_KEY=sk-or-...   # from openrouter.ai → Keys
+python3 -m journal_os.server --port 8090
+```
+
+**On Vercel:** project → **Settings → Environment Variables** → add `JOURNAL_OS_LLM_API_KEY` (Production, marked Sensitive), then **Redeploy**; variables only reach new deployments. To use OpenCode Zen, Groq, Gemini or Claude instead, also add `JOURNAL_OS_LLM_BASE_URL` and `JOURNAL_OS_LLM_MODEL`. [HARNESS.md → Connect a model](HARNESS.md#connect-a-model) has the value for each provider, the optional settings, and what happens when a call fails (the stand-in answers, with a note). The key stays on the server. Every change a model asks for is still an approval card.
+
 ## Test it
 
 ```bash
 python3 -m unittest discover -s tests -v
 ```
 
-Result on 2026-11-12: **103 tests, all passing** (24 in `tests/test_journal_os.py`, 28 in `tests/test_agent_harness.py`, 19 in `tests/test_harness_routes.py`, 11 in `tests/test_barnacle_context.py`, 21 for the older modules).
+Result on 2026-11-12: **141 tests, all passing** (24 in `tests/test_journal_os.py`, 28 in `tests/test_agent_harness.py`, 19 in `tests/test_harness_routes.py`, 11 in `tests/test_barnacle_context.py`, 18 in `tests/test_automations.py`, 20 in `tests/test_model_runtime.py`, 21 for the older modules). Unset any `JOURNAL_OS_LLM_*` variables first, or the older tests will call your real model.
 
 | Area | Tests |
 |---|---|
@@ -42,9 +53,11 @@ Result on 2026-11-12: **103 tests, all passing** (24 in `tests/test_journal_os.p
 | Agent harness: channels | slug names, duplicates and the reserved `dm-` prefix refused; private channels and DMs hidden from non-members; DMs reused and closed to third members; archive and last-owner rules; viewers read but can't post; members must belong to the workspace |
 | Agent harness: agents | defaults (handle, `memory_path`, model `none`, grants); 11 invalid inputs refused with nothing half-created; only the owner creates or edits; grants are `propose` only and can be revoked; bootstrap is idempotent; `MEMORY.md` shows approved memories only |
 | Agent harness: messages | @mentions resolve only to agents in the channel; threads stay one level deep; listing and limits; agents must be active posting members; reply chains stop after 4 hops |
+| Automations | setup creates three once; no backfill when set up late; runs once per day or week and catches up later the same day; missed days aren't replayed; Sunday-only weekly review; off and time changes; brief lists today and open tasks; the evening draft saves nothing until approved and links today's event; reject changes nothing; only the owner edits or runs; a member's clock never runs the owner's; a paused agent records an error; the local ticker reaches the live feed |
+| Model driver | against a fake provider: a tool call becomes a pending card; plain replies post as text; a timeout, HTTP errors, bad JSON and six kinds of invalid tool call fall back to the stand-in with a note; the key never appears in responses or logs; other requests run while the model thinks; automations reworded only when every time survives |
 | Agent harness: approvals | a tool call saves nothing until approved; approve runs it, reject doesn't; mixed outcomes; agent proposals can't be approved from the command bar; 6 kinds of bad tool call write nothing; memory tools need a ledger and still need ledger approval; only the owner decides; edits can't retarget; failures are recorded; `post_message` posts only after approval; other workspaces and private channels stay closed; a pending approval survives a restart |
 
-**Browser end-to-end and recording:** `scripts/record_demo.py` drives the real UI in headless Chromium, restarts the server partway through, and saves `journey.webm` and screenshots. On 2026-11-12 it passed 11/11 checks with no page errors. `scripts/harness_demo.py` does the same for Channels with two tabs (14/14 checks; see [HARNESS.md](HARNESS.md)), and `scripts/barnacle_demo.py` for the Barnacle companion (12/12 checks). Both need `pip install playwright && python -m playwright install chromium`.
+**Browser end-to-end and recording:** `scripts/record_demo.py` drives the real UI in headless Chromium, restarts the server partway through, and saves `journey.webm` and screenshots. On 2026-11-12 it passed 11/11 checks with no page errors. `scripts/harness_demo.py` does the same for Channels with two tabs (14/14 checks; see [HARNESS.md](HARNESS.md)), `scripts/barnacle_demo.py` for the Barnacle companion (12/12 checks), and `scripts/automations_demo.py` for the automations, moving the browser's clock to 8:05 and 20:05 (10/10 checks). They need `pip install playwright && python -m playwright install chromium`.
 
 ```bash
 python3 scripts/record_demo.py --out demo-output
@@ -66,7 +79,7 @@ journal_os/
   store.py              data layer; every method checks workspace role first (now also channels, agents, messages, approvals)
   interpreter.py        deterministic NL → whitelisted action; LLM adapter interface
   actions.py            proposal → approve/reject → execute; agent tool-call decisions; sandbox simulation
-  harness.py            agent reply path: the rule-based stand-in and the AgentRuntime interface
+  harness.py            agent reply path: OpenAI-compatible model driver, the rule-based stand-in fallback
   registry.py           shared app registry with honest status labels
   server.py             HTTP routes (/api/os/*) + local server
 skeleton/interfaces.py  existing Animal Scrypt kernel (companions, memory ledger), reused as-is
@@ -96,7 +109,7 @@ api/index.py            existing Vercel gateway; now forwards /api/os/* to Journ
 | `audit_log` | every write, including where it came from (manual, command, agent, sandbox, import) |
 | `channels` | Slack-style rooms per workspace: `public`, `private`, `dm`, `agent-room`; shared `instructions` every agent in the room receives; `archived_at` |
 | `channel_members` | who is in a channel: `human`, `agent` or `companion`; role `owner`, `member` or `observer` (observers read only) |
-| `agents` | name, `@handle`, role, `system_prompt`, `model` (`none` until a runtime exists), owner, optional linked companion (whose memory ledger the agent uses), status `active`/`paused`/`archived`, `memory_path`, `monthly_budget_usd` |
+| `agents` | name, `@handle`, role, `system_prompt`, `model` (`none` = the server's model, `stand-in` = never call a model, or an allowed model id), owner, optional linked companion (whose memory ledger the agent uses), status `active`/`paused`/`archived`, `memory_path`, `monthly_budget_usd` |
 | `messages` | channel posts and one-level threads (`thread_id` = root). `author_type` `human`, `agent` or `system`; `mentions_json`, `tool_calls_json`, `approval_status` (none, pending, approved, rejected, mixed), and `hop`, the agent reply depth |
 | `approvals` | one row per agent tool call: `tool_name`, `tool_input_json`, status `pending` → `approved` / `rejected` / `failed`, `decided_by`, result, and `proposal_id` linking planner/journal/memory tools to `action_proposals` |
 
@@ -165,10 +178,9 @@ The goal is a Slack-style space inside the journal, where you, your companions a
 | Messages | `post_message` (people), `post_agent_message` (agents; tool calls become approvals), `get_message`, `list_messages` (top level or one thread) |
 | Approvals | `get_approval`, `list_approvals`, `require_approver`, `finish_approval` (internal); deciding is `ActionService.decide_tool_call` |
 
-**Built since:** Prompt 2 added the Channels view, its HTTP routes, a live stream and a rule-based stand-in agent. See [HARNESS.md](HARNESS.md).
+**Built since:** Prompt 2 added the Channels view, its HTTP routes, a live stream and a rule-based stand-in agent. Prompt 3 added one OpenAI-compatible model driver for every provider (OpenRouter, OpenCode Zen, Groq, Gemini, Ollama, Claude), with the stand-in as fallback. See [HARNESS.md → Connect a model](HARNESS.md#connect-a-model).
 
-**Still to build: a real model runtime**
-- A driver per model provider; a provider that isn't configured reports itself unavailable.
+**Still to build**
 - An `agent_runs` queue with one run per agent per trigger message, so slow replies happen in the background.
 - A usage ledger that enforces `monthly_budget_usd`.
 
@@ -180,12 +192,36 @@ Barnacle is a gold bubble in the bottom-right corner of every Journal OS view (p
 
 - **Same system, same gate.** The conversation is a DM in [Channels](HARNESS.md), so messages land in the `messages` table and every change the agent asks for is a normal approval card. Nothing in the journal, planner or memory ledger changes until you press Approve. The same conversation is visible under Channels → DMs.
 - **Light context.** With each message Barnacle sends what you're looking at: the open journal entry, the event you last opened in the planner, and any text you've selected. The panel shows this as chips you can remove before sending. The server re-reads titles from the database and refuses anything outside your workspace, and the message records what was shared.
+- **What a model does with it.** It reads the open entry's text (or the event's notes) and your selection, so "summarise this" works. Changes it suggests are still approval cards.
 - **What the stand-in does with it.**
   - "Remember this" proposes the selected text as a memory, linked to the entry or event.
   - "Move this to Friday at 3pm", "Cancel this" and "Create a journal entry for this" target the open event.
   - Anything else gets suggestions based on what you're viewing.
 - **Presence.** The bubble floats and pulses gently, and its badge shows how many approvals are waiting. When you select a sentence in the journal it offers "Want me to keep…?". On first visit it introduces itself; **Show me** (or **Demo** in the panel) types a sample request and sends it, producing a real approval card to approve or reject. If the workspace has no agent yet, the demo sets up PATCH first.
 - **Motion** is turned off for people who ask their system for reduced motion.
+
+---
+
+## Automations
+
+Setting up Channels (**Create #general with PATCH**, or **Turn on automations** in the Channels sidebar) adds three automations. PATCH posts them on its own:
+
+| Automation | When | Where | What |
+|---|---|---|---|
+| ☀️ Morning brief | every day, 8:00 | #general | Today's plan, unfinished tasks from the past week, and how many requests are waiting for approval. |
+| 🌙 Evening journal prompt | every day, 20:00 | the DM with PATCH, which is also Barnacle's conversation | Asks how the day went and attaches a draft "Evening reflection" entry, linked to the day's longest event, as an approval card. The bubble's badge counts it. |
+| 🗓️ Weekly review | Sundays, 18:00 | #general | The week's events and how many were marked done, journal entries, memories, and agent requests approved, rejected or waiting. |
+
+- **Nothing changes without you.** Posting a message is all an automation does by itself. The evening draft reaches your journal only if you press Approve, and you can edit it there afterwards.
+- **Change or stop them.** Click one in the Channels sidebar to turn it off, change its time (and the weekly review's day), or **Run now**. Only the workspace owner can change or run them.
+- **How they're scheduled.** Each automation runs at most once per day (or week); the server records the period it last ran for. Two things ask what is due:
+  - the local server, every 30 seconds (`--no-automations` turns this off);
+  - the browser, when the app opens, every 5 minutes while it is open, and when the tab comes back into view. It sends its own clock, so times follow your timezone even on Vercel, whose servers run on UTC.
+- **Catching up.** If nothing was running at 8:00, the brief posts the next time the app or server checks that day. Missed days aren't replayed, and setting up at 21:00 doesn't post a morning brief at night.
+- **Wording.** The messages are put together from your data by fixed rules. With a model connected, it rewords the morning brief and weekly review in the agent's voice, with no tools. If the call fails, or the rewrite drops a time, the template text is posted. The evening prompt and its draft are never reworded. `JOURNAL_OS_LLM_AUTOMATIONS=off` turns rewording off.
+- **On Vercel** they only run while someone has the app open, and the demo database resets, so use **Run now** there.
+
+Code: `journal_os/automations.py` and the `automations` table in `journal_os/schema.sql`. Endpoints are listed in [HARNESS.md](HARNESS.md#endpoints).
 
 ---
 
@@ -207,16 +243,17 @@ Barnacle is a gold bubble in the bottom-right corner of every Journal OS view (p
 | Backend authorization, workspace roles, companion grants | **Working** (tested) |
 | Zine, School, Studio cards | **Open the existing modules** |
 | LLM interpretation | **Planned**: the adapter interface exists, but no provider is wired up |
-| Suggested and Autonomous-Sandbox autonomy modes, scheduled background runs | **Planned** (only Manual mode exists) |
+| Suggested and Autonomous-Sandbox autonomy modes | **Planned** (only Manual mode exists) |
 | Shared workspaces UI, invitations, mutual consent | **Planned** (backend memberships and roles exist; there is no UI) |
 | Cross-account companion play | **Disabled** until identity verification ships |
 | World module, device integration | **Planned** |
 | Agent harness data layer: channels, members, agents, messages, approvals | **Working** (store + tests) |
 | Channels view: channels, DMs, threads, @mentions, approval cards, live updates | **Working** ([HARNESS.md](HARNESS.md)); live updates are 3-second polling on Vercel |
-| Agents answering in channels | **Stand-in**: rule-based replies using the command bar's interpreter; no model is connected |
-| Barnacle floating companion (every view, context chips, approval cards in the panel) | **Working**; replies come from the stand-in |
+| Agents answering in channels | **Working with a model** once `JOURNAL_OS_LLM_API_KEY` (or another provider) is set ([setup](HARNESS.md#connect-a-model)); otherwise, and whenever a call fails, the rule-based stand-in |
+| Barnacle floating companion (every view, context chips, approval cards in the panel) | **Working**; replies come from the model, or the stand-in without one |
+| Automations: morning brief, evening journal prompt, weekly review | **Working**; built from your data by fixed rules, and reworded by the model when one is connected |
 | Model runtime (drivers, background runs, budgets) | **Planned** |
-| Agent budgets | **Stored only**: `monthly_budget_usd` is saved but nothing spends or enforces it until the runtime exists |
+| Agent budgets | **Stored only**: `monthly_budget_usd` is saved but not enforced; free-tier daily caps are the only limit on model use |
 
 ## Known limitations
 

@@ -191,6 +191,7 @@ CREATE TABLE IF NOT EXISTS messages (
     mentions_json TEXT NOT NULL DEFAULT '[]',    -- ids of @mentioned agents (who should answer)
     tool_calls_json TEXT NOT NULL DEFAULT '[]',  -- [{tool, input, approval_id}]
     context_json TEXT NOT NULL DEFAULT '{}',     -- what the person was looking at (entry/event title, selection)
+    runtime TEXT NOT NULL DEFAULT '',            -- agent messages: model id that wrote it, or 'stand-in'
     approval_status TEXT NOT NULL DEFAULT 'none'
         CHECK (approval_status IN ('none', 'pending', 'approved', 'rejected', 'mixed')),
     hop INTEGER NOT NULL DEFAULT 0,              -- agent-to-agent reply depth; capped to stop loops
@@ -215,3 +216,25 @@ CREATE TABLE IF NOT EXISTS approvals (
     decided_at TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_approvals_ws_status ON approvals(workspace_id, status);
+
+-- Automations: an agent posts on a schedule (journal_os/automations.py).
+-- Posting chat text is all they do unprompted; any change they suggest is a
+-- pending approval. last_period ('2026-11-12' or '2026-W46') makes runs idempotent.
+CREATE TABLE IF NOT EXISTS automations (
+    id TEXT PRIMARY KEY,
+    workspace_id TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+    kind TEXT NOT NULL CHECK (kind IN ('morning_brief', 'evening_prompt', 'weekly_review')),
+    agent_id TEXT NOT NULL REFERENCES agents(id) ON DELETE CASCADE,
+    channel_id TEXT NOT NULL REFERENCES channels(id) ON DELETE CASCADE,
+    time_of_day TEXT NOT NULL,         -- local wall time 'HH:MM'
+    weekday INTEGER,                   -- 0 = Monday … 6 = Sunday; NULL means every day
+    enabled INTEGER NOT NULL DEFAULT 1,
+    owner_id TEXT NOT NULL REFERENCES users(id),  -- the agent posts on this person's behalf
+    last_period TEXT,
+    last_run_at TEXT,
+    last_message_id TEXT,
+    last_error TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    UNIQUE (workspace_id, kind)
+);

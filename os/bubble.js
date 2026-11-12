@@ -35,7 +35,7 @@ const B = {
   busy: false,
 };
 
-const Barnacle = { mount: bnMount, unmount: bnUnmount, onRoute: bnOnRoute };
+const Barnacle = { mount: bnMount, unmount: bnUnmount, onRoute: bnOnRoute, notice: bnNotice };
 
 const bnWait = (ms) => new Promise((resolve) => { setTimeout(resolve, ms); });
 const bnCalm = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -170,8 +170,10 @@ async function bnLoad() {
     if (!agent) { bnDrawNoAgent(); return; }
     B.agentId = agent.id;
     const sub = $('#bn-sub');
-    sub.textContent = `with ${agent.name}${agent.model === 'none' ? ' · stand-in' : ''}`;
-    sub.title = agent.model === 'none' ? 'No model is connected yet, so replies come from a rule-based stand-in.' : agent.model;
+    const rt = agentRuntime(agent);
+    sub.textContent = `with ${agent.name} · ${rt.kind === 'model' ? shortModel(rt.model) : 'stand-in'}`;
+    sub.title = rt.kind === 'model' ? `Replies come from ${rt.model}${rt.provider ? ` via ${rt.provider}` : ''}. Changes still wait for your approval.`
+      : 'No model is connected, so replies come from a rule-based stand-in.';
     $('#bn-input').placeholder = `Message ${agent.name}`;
     if (S.ws.role === 'viewer') { bnDrawNote('You have view-only access, so you can’t chat with agents in this workspace.'); return; }
     if (!B.channel || !B.channel.dm_with || B.channel.dm_with.member_id !== agent.id) {
@@ -361,7 +363,7 @@ async function bnDemo() {
   if (!B.open) await bnOpen();
   if (!B.channel && S.ws.role === 'owner' && !H.agents.some((a) => a.status === 'active')) {
     // Asking for the demo is asking for an agent to demo with.
-    const res = await guard(() => api('POST', wsPath('/harness/bootstrap')));
+    const res = await guard(() => api('POST', wsPath('/harness/bootstrap'), { now: localIso(new Date()) }));
     if (!res) return;
     toast('Set up PATCH for the demo.');
     B.channel = null;
@@ -412,7 +414,7 @@ async function bnOnClick(e) {
     case 'drop-selection': B.selection = ''; return bnDrawContext();
     case 'setup': {
       act.disabled = true;
-      const res = await guard(() => api('POST', wsPath('/harness/bootstrap')));
+      const res = await guard(() => api('POST', wsPath('/harness/bootstrap'), { now: localIso(new Date()) }));
       act.disabled = false;
       if (res) { B.channel = null; await bnLoad(); }
       return undefined;
@@ -438,6 +440,15 @@ async function bnDecide(id, approve, btn) {
 }
 
 /* ---------------------------------------------------------------- presence */
+// An automation posted while the live feed may be idle (it only runs while
+// Barnacle or Channels is open), so the clock tells Barnacle directly.
+function bnNotice(message, inMyDm) {
+  if (!B.mounted) return;
+  bnRefreshBadge();
+  if (!inMyDm) return;
+  if (B.open && (!B.channel || B.channel.id === message.channel_id)) bnLoadMessages();
+  else if (!B.open) $('#bn-bubble').classList.add('has-news');
+}
 async function bnRefreshBadge() {
   if (!B.mounted) return;
   const pending = await guard(() => api('GET', wsPath('/approvals?status=pending')));
