@@ -255,6 +255,21 @@ Code: `journal_os/automations.py` and the `automations` table in `journal_os/sch
 | Model runtime (drivers, background runs, budgets) | **Planned** |
 | Agent budgets | **Stored only**: `monthly_budget_usd` is saved but not enforced; free-tier daily caps are the only limit on model use |
 
+## Pixel-world controls
+
+Every switch and slider in Journal OS, plus the live indicator in Channels, is drawn as a small PATCH scene. This uses the [pixel-worlds](https://github.com/finktheartist/pixel-worlds) method (MIT): paint the scene, light it, then snap it to a fixed palette. It lives in `os/pixel-controls.js`, one file with no dependencies, and loads on every view. It is also inlined into the Companion Device teardown by `device/build.cjs`. To see them all on one page, open `/os/pixel-controls.html`.
+
+| Control | Scene | Where it appears |
+|---|---|---|
+| Switch (checkbox) | PATCH's head slides across. When off, it is asleep and grey. When on, it is awake: lit lime ear panels, open eyes, a blush, and a rail of lit LEDs. | Automation On/Off, the event dialog's Completed checkbox, agent permissions, channel agent picks, and the teardown's Annotations and Fill |
+| Slider (range) | A small PATCH stands at the value on a rail. The LEDs light up behind it, and it hops while moving. The hue slider gets a stepped rainbow rail, and PATCH's ears take the chosen hue. | Every slider in the teardown: part spacing, ear tilt, left-arm wave, battery capacity and line hue |
+| Live indicator | A small antenna. Lime arcs mean live, blinking amber means reconnecting, and grey means connecting. | The Channels header |
+
+- **It is still the real control.** The `<input>` stays in the page, on top of the art, so clicks, drags, the keyboard, forms and screen readers work exactly as before.
+- **States in the art.** Focus shows as a lime outline drawn in the art. A pressed switch sits down onto its shadow, and disabled controls are dithered over.
+- **Opting out.** Inputs with `.sr`, `.sr-only` or `data-pw="off"` are left alone.
+- **Checks.** `scripts/pixel_controls_demo.py` runs 11 checks: a real mouse press and drag, the keyboard, form saving, 5 switches at 61 fps, the hue rail, phone width, and page errors.
+
 ## Known limitations
 
 1. **Sign-in is device-trust, with no password.** Anyone who can reach the server can open any profile by name. That is fine on `127.0.0.1`, but do not expose it to the internet with real data. Real authentication (passkeys, or a password plus rate limiting) is the next security task.

@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pixel controls</title>
+<style>
+  :root { color-scheme: dark; }
+  body { margin: 0; padding: 24px 16px; background: #17151d; color: #ecebf0; font: 15px/1.45 -apple-system, "Helvetica Neue", "Segoe UI", sans-serif; }
+  main { max-width: 640px; margin: 0 auto; display: grid; gap: 22px; }
+  h1 { font-size: 22px; margin: 0; }
+  h2 { font-size: 13px; letter-spacing: .08em; text-transform: uppercase; color: #a6a1b4; margin: 0 0 8px; }
+  .row { display: flex; flex-wrap: wrap; gap: 14px 22px; align-items: center; }
+  label { display: inline-flex; align-items: center; gap: 10px; }
+  .slider { display: grid; gap: 4px; }
+  .live-dot { font: 600 12px ui-monospace, monospace; letter-spacing: .08em; text-transform: uppercase; color: #a6a1b4; }
+  .live-dot::before { content: ""; width: 10px; height: 10px; background: #7d7790; display: inline-block; margin-right: 8px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Journal OS pixel controls</h1>
+  <p>Every switch, slider and live indicator in Journal OS is a real input with a small PATCH scene painted underneath it.</p>
+  <section><h2>Switch</h2>
+    <div class="row">
+      <label id="sw-off"><input type="checkbox"> Off</label>
+      <label id="sw-on"><input type="checkbox" checked> On</label>
+      <label id="sw-dis"><input type="checkbox" disabled> Disabled</label>
+    </div>
+  </section>
+  <section><h2>Slider</h2>
+    <div class="slider" id="sl-a"><label for="r1">Ear tilt</label><input id="r1" type="range" min="0" max="35" value="6"></div>
+    <div class="slider" id="sl-b"><label for="r2">Battery capacity</label><input id="r2" type="range" min="3000" max="4000" step="250" value="3750"></div>
+    <div class="slider" id="sl-hue"><label for="r3">Line hue</label><input id="r3" type="range" min="0" max="360" value="300" aria-label="Line hue"></div>
+  </section>
+  <section><h2>Live indicator</h2>
+    <div class="row">
+      <span id="st-on"><span class="live-dot on">Live</span></span>
+      <span id="st-retry"><span class="live-dot retry">Reconnecting…</span></span>
+      <span id="st-off"><span class="live-dot">Connecting</span></span>
+    </div>
+  </section>
+</main>
+<script src="pixel-controls.js"></script>
+</body>
+</html>
