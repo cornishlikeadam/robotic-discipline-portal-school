@@ -27,6 +27,7 @@ const H = {
   agents: [],
   agentsById: {},
   pending: [],
+  automations: [],
   channel: null,
   messages: [],
   thread: null,
@@ -135,6 +136,8 @@ async function hxMount() {
         <ul class="hx-list" id="hx-channels" aria-labelledby="hx-ch-label"></ul>
         <div class="hx-side-head"><h2 id="hx-ag-label">Agents</h2>${hxIsOwner() ? '<button type="button" class="btn small" data-new-agent aria-label="New agent">+ New</button>' : ''}</div>
         <ul class="hx-list" id="hx-agents" aria-labelledby="hx-ag-label"></ul>
+        <div class="hx-side-head"><h2 id="hx-au-label">Automations</h2></div>
+        <ul class="hx-list" id="hx-automations" aria-labelledby="hx-au-label"></ul>
         <p class="muted hx-side-note">No model is connected yet, so agents answer with a rule-based stand-in.</p>
       </aside>
       <section class="hx-main" id="hx-main" aria-label="Conversation"><p class="loading">Loading channels…</p></section>
@@ -146,7 +149,7 @@ async function hxMount() {
   LiveFeed.onState(hxLiveState);
   LiveFeed.hold('channels'); // before loading, so nothing that happens meanwhile is missed
   await hxLoadAgents();
-  await Promise.all([hxLoadChannels(), hxLoadPending()]);
+  await Promise.all([hxLoadChannels(), hxLoadPending(), hxLoadAutomations()]);
   hxDrawSide();
 }
 
@@ -155,6 +158,10 @@ async function hxLoadChannels() { const r = await guard(() => api('GET', wsPath(
 async function hxLoadAgents() {
   const r = await guard(() => api('GET', wsPath('/agents')));
   if (r) { H.agents = r; H.agentsById = Object.fromEntries(r.map((a) => [a.id, a])); }
+}
+async function hxLoadAutomations() {
+  const r = await guard(() => api('GET', wsPath(`/automations?now=${encodeURIComponent(localIso(new Date()))}`)));
+  if (r) H.automations = r;
 }
 async function hxLoadPending() { const r = await guard(() => api('GET', wsPath('/approvals?status=pending'))); if (r) H.pending = r; }
 
@@ -173,6 +180,7 @@ function hxFlush() {
     if (d.agents) await hxLoadAgents();
     if (d.channels) await hxLoadChannels();
     if (d.pending) await hxLoadPending();
+    if (d.automations) await hxLoadAutomations();
     if (d.channel && H.channel) {
       const ch = await guard(() => api('GET', `/api/os/channels/${H.channel.id}`));
       if (ch && H.channel && ch.id === H.channel.id) {
@@ -208,6 +216,86 @@ function hxDrawSide() {
   $('#hx-agents').innerHTML = H.agents.map((a) => `<li><button type="button" class="hx-agent" data-dm="${esc(a.id)}" title="Direct message ${esc(a.name)}">
       ${agentAvatar(a)}<span><b>${esc(a.name)}</b><small>@${esc(a.handle)} · ${a.model === 'none' ? 'stand-in' : esc(a.model)}${a.status !== 'active' ? ` · ${esc(a.status)}` : ''}</small></span></button></li>`).join('')
     || '<li class="muted">No agents yet.</li>';
+  hxDrawAutomations();
+}
+
+/* ---------------------------------------------------------------- automations */
+const AUTO_ICON = { morning_brief: '☀️', evening_prompt: '🌙', weekly_review: '🗓️' };
+const AUTO_DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+function hxWhen(iso) {
+  if (!iso) return '';
+  const d = parseIso(iso);
+  const t = d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  const today = new Date();
+  const tomorrow = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1);
+  if (dayKey(d) === dayKey(today)) return `today ${t}`;
+  if (dayKey(d) === dayKey(tomorrow)) return `tomorrow ${t}`;
+  return `${AUTO_DAYS[(d.getDay() + 6) % 7]} ${t}`;
+}
+function hxDrawAutomations() {
+  const list = $('#hx-automations');
+  if (!list) return;
+  if (!H.automations.length) {
+    list.innerHTML = hxIsOwner() && H.agents.length
+      ? '<li><button type="button" class="btn small" data-setup-automations>Turn on automations</button></li>'
+      : '<li class="muted">None yet. They start with #general and PATCH.</li>';
+    return;
+  }
+  list.innerHTML = H.automations.map((a) => `<li><button type="button" class="hx-auto${a.enabled ? '' : ' off'}" data-automation="${esc(a.id)}">
+      <span class="ic" aria-hidden="true">${AUTO_ICON[a.kind] || '⏱'}</span>
+      <span><b>${esc(a.name)}</b><small>${a.enabled ? `next ${esc(hxWhen(a.next_run))} · ${esc(a.where)}` : 'off'}${a.last_error ? ' · last run failed' : ''}</small></span></button></li>`).join('');
+}
+async function hxSetupAutomations(btn) {
+  if (btn) btn.disabled = true;
+  const res = await guard(() => api('POST', wsPath('/harness/bootstrap'), { now: localIso(new Date()) }));
+  if (btn) btn.disabled = false;
+  if (!res) return;
+  await Promise.all([hxLoadAutomations(), hxLoadChannels()]);
+  hxDrawSide();
+  toast('Automations are on. Open one to change its time or run it now.');
+}
+function hxAutomationDialog(id) {
+  const a = H.automations.find((x) => x.id === id);
+  if (!a) return;
+  const owner = hxIsOwner();
+  const weekly = a.weekday !== null && a.weekday !== undefined;
+  const dis = owner ? '' : ' disabled';
+  const last = a.last_run_at ? `Last run ${esc(hxWhen(a.last_run_at))}` : 'Hasn’t run yet';
+  hxDialog(`<h2 id="hx-dialog-title">${AUTO_ICON[a.kind] || ''} ${esc(a.name)}</h2>
+    <p class="muted">${esc(a.about)} ${esc(a.agent_name)} posts it in ${esc(a.where)}. It only ever posts a message: any change it suggests waits for your approval.</p>
+    <div class="fields">
+      <label class="check"><input type="checkbox" name="enabled"${a.enabled ? ' checked' : ''}${dis}> On</label>
+      <label>Time<input type="time" name="time_of_day" value="${esc(a.time_of_day)}" required${dis}></label>
+      ${weekly ? `<label>Day<select name="weekday"${dis}>${AUTO_DAYS.map((d, i) => `<option value="${i}"${i === a.weekday ? ' selected' : ''}>${d}</option>`).join('')}</select></label>` : ''}
+    </div>
+    <p class="muted hx-auto-meta">${a.enabled ? `Next run ${esc(hxWhen(a.next_run))}. ` : ''}${last}.${a.last_error ? ` <span class="err">Last run failed: ${esc(a.last_error)}</span>` : ''}</p>
+    <div class="toolbar">${owner ? '<button type="button" class="btn" data-run-automation>Run now</button>' : ''}<span class="grow"></span>
+      <button type="button" class="btn" data-cancel>${owner ? 'Cancel' : 'Close'}</button>${owner ? '<button type="submit" class="btn primary">Save</button>' : ''}</div>`,
+  async (form) => {
+    if (!owner) return true;
+    const body = { enabled: form.enabled.checked, time_of_day: form.time_of_day.value, now: localIso(new Date()) };
+    if (weekly) body.weekday = Number(form.weekday.value);
+    const res = await guard(() => api('POST', `/api/os/automations/${a.id}`, body));
+    if (!res) return false;
+    H.automations = H.automations.map((x) => (x.id === res.id ? res : x));
+    hxDrawAutomations();
+    toast(res.enabled ? `${res.name}: next run ${hxWhen(res.next_run)}.` : `${res.name} is off.`);
+    return true;
+  });
+  const run = $('#hx-dialog-form [data-run-automation]');
+  if (run) run.addEventListener('click', async () => {
+    run.disabled = true;
+    const res = await guard(() => api('POST', `/api/os/automations/${a.id}/run`, { now: localIso(new Date()) }));
+    run.disabled = false;
+    if (!res) return;
+    $('#hx-dialog').close();
+    H.automations = H.automations.map((x) => (x.id === res.automation.id ? res.automation : x));
+    hxDrawAutomations();
+    if (res.error) { toast(`${a.name} couldn’t post: ${res.error}`, true); return; }
+    AutoTick.announce([res]);
+    hxRefresh({ pending: true, channels: true });
+    hxGo(res.message.channel_id);
+  });
 }
 
 /* ---------------------------------------------------------------- empty state */
@@ -222,7 +310,7 @@ function hxDrawEmpty() {
   const boot = $('#hx-boot');
   if (boot) boot.addEventListener('click', async () => {
     boot.disabled = true;
-    const res = await guard(() => api('POST', wsPath('/harness/bootstrap')));
+    const res = await guard(() => api('POST', wsPath('/harness/bootstrap'), { now: localIso(new Date()) }));
     boot.disabled = false;
     if (!res) return;
     await hxLoadAgents();
@@ -558,6 +646,10 @@ async function hxOnClick(e) {
   if (jump) return hxJump(jump.dataset.jump);
   if (t.closest('[data-new-channel]')) return hxNewChannelDialog();
   if (t.closest('[data-new-agent]')) return hxNewAgentDialog();
+  const auto = t.closest('[data-automation]');
+  if (auto) return hxAutomationDialog(auto.dataset.automation);
+  const setup = t.closest('[data-setup-automations]');
+  if (setup) return hxSetupAutomations(setup);
   return undefined;
 }
 
@@ -781,6 +873,8 @@ function hxOnChange(ev) {
     if (here) f.channel = true;
   } else if (ev.type === 'agent') {
     f.agents = true;
+  } else if (ev.type === 'automation') {
+    f.automations = true;
   }
   hxRefresh(f);
 }
@@ -832,3 +926,38 @@ function liveDisconnect() {
   feed.timer = null;
   feed.setState('off');
 }
+
+/* ---------------------------------------------------------------- automation clock
+   There is no always-on scheduler on hosts like Vercel, so while the app is
+   open the browser asks the server to run anything that is due, on its own
+   clock. The server runs each automation at most once per day (or week), so
+   several tabs, or the local server's own ticker, can't double-post. */
+const AutoTick = {
+  timer: null,
+  start() {
+    this.stop();
+    this.timer = setInterval(() => this.run(), 5 * 60 * 1000);
+    document.addEventListener('visibilitychange', this.onVisible);
+    this.run();
+  },
+  stop() {
+    clearInterval(this.timer);
+    this.timer = null;
+    document.removeEventListener('visibilitychange', this.onVisible);
+  },
+  onVisible() { if (document.visibilityState === 'visible') AutoTick.run(); },
+  async run() {
+    if (!S.token || !S.ws) return;
+    let ran = null;
+    try { ran = await api('POST', wsPath('/automations/tick'), { now: localIso(new Date()) }); } catch { return; } // quiet: try again next tick
+    if (ran && ran.length) this.announce(ran);
+  },
+  announce(runs) {
+    runs.filter((r) => r.message).forEach((r) => {
+      const a = r.automation;
+      toast(`${a.agent_name} posted the ${a.name.toLowerCase()} in ${a.where}.`);
+      if (typeof Barnacle !== 'undefined') Barnacle.notice(r.message, a.where.startsWith('DM'));
+    });
+    if (H.mounted) hxRefresh({ automations: true, pending: true, channels: true, messages: true });
+  },
+};

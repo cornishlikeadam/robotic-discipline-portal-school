@@ -27,7 +27,7 @@ Python 3.10+ standard library only. No pip install is needed to run it.
 python3 -m unittest discover -s tests -v
 ```
 
-Result on 2026-11-12: **103 tests, all passing** (24 in `tests/test_journal_os.py`, 28 in `tests/test_agent_harness.py`, 19 in `tests/test_harness_routes.py`, 11 in `tests/test_barnacle_context.py`, 21 for the older modules).
+Result on 2026-11-12: **121 tests, all passing** (24 in `tests/test_journal_os.py`, 28 in `tests/test_agent_harness.py`, 19 in `tests/test_harness_routes.py`, 11 in `tests/test_barnacle_context.py`, 18 in `tests/test_automations.py`, 21 for the older modules).
 
 | Area | Tests |
 |---|---|
@@ -42,9 +42,10 @@ Result on 2026-11-12: **103 tests, all passing** (24 in `tests/test_journal_os.p
 | Agent harness: channels | slug names, duplicates and the reserved `dm-` prefix refused; private channels and DMs hidden from non-members; DMs reused and closed to third members; archive and last-owner rules; viewers read but can't post; members must belong to the workspace |
 | Agent harness: agents | defaults (handle, `memory_path`, model `none`, grants); 11 invalid inputs refused with nothing half-created; only the owner creates or edits; grants are `propose` only and can be revoked; bootstrap is idempotent; `MEMORY.md` shows approved memories only |
 | Agent harness: messages | @mentions resolve only to agents in the channel; threads stay one level deep; listing and limits; agents must be active posting members; reply chains stop after 4 hops |
+| Automations | setup creates three once; no backfill when set up late; runs once per day or week and catches up later the same day; missed days aren't replayed; Sunday-only weekly review; off and time changes; brief lists today and open tasks; the evening draft saves nothing until approved and links today's event; reject changes nothing; only the owner edits or runs; a member's clock never runs the owner's; a paused agent records an error; the local ticker reaches the live feed |
 | Agent harness: approvals | a tool call saves nothing until approved; approve runs it, reject doesn't; mixed outcomes; agent proposals can't be approved from the command bar; 6 kinds of bad tool call write nothing; memory tools need a ledger and still need ledger approval; only the owner decides; edits can't retarget; failures are recorded; `post_message` posts only after approval; other workspaces and private channels stay closed; a pending approval survives a restart |
 
-**Browser end-to-end and recording:** `scripts/record_demo.py` drives the real UI in headless Chromium, restarts the server partway through, and saves `journey.webm` and screenshots. On 2026-11-12 it passed 11/11 checks with no page errors. `scripts/harness_demo.py` does the same for Channels with two tabs (14/14 checks; see [HARNESS.md](HARNESS.md)), and `scripts/barnacle_demo.py` for the Barnacle companion (12/12 checks). Both need `pip install playwright && python -m playwright install chromium`.
+**Browser end-to-end and recording:** `scripts/record_demo.py` drives the real UI in headless Chromium, restarts the server partway through, and saves `journey.webm` and screenshots. On 2026-11-12 it passed 11/11 checks with no page errors. `scripts/harness_demo.py` does the same for Channels with two tabs (14/14 checks; see [HARNESS.md](HARNESS.md)), `scripts/barnacle_demo.py` for the Barnacle companion (12/12 checks), and `scripts/automations_demo.py` for the automations, moving the browser's clock to 8:05 and 20:05 (10/10 checks). They need `pip install playwright && python -m playwright install chromium`.
 
 ```bash
 python3 scripts/record_demo.py --out demo-output
@@ -189,6 +190,29 @@ Barnacle is a gold bubble in the bottom-right corner of every Journal OS view (p
 
 ---
 
+## Automations
+
+Setting up Channels (**Create #general with PATCH**, or **Turn on automations** in the Channels sidebar) adds three automations. PATCH posts them on its own:
+
+| Automation | When | Where | What |
+|---|---|---|---|
+| ☀️ Morning brief | every day, 8:00 | #general | Today's plan, unfinished tasks from the past week, and how many requests are waiting for approval. |
+| 🌙 Evening journal prompt | every day, 20:00 | the DM with PATCH, which is also Barnacle's conversation | Asks how the day went and attaches a draft "Evening reflection" entry, linked to the day's longest event, as an approval card. The bubble's badge counts it. |
+| 🗓️ Weekly review | Sundays, 18:00 | #general | The week's events and how many were marked done, journal entries, memories, and agent requests approved, rejected or waiting. |
+
+- **Nothing changes without you.** Posting a message is all an automation does by itself. The evening draft reaches your journal only if you press Approve, and you can edit it there afterwards.
+- **Change or stop them.** Click one in the Channels sidebar to turn it off, change its time (and the weekly review's day), or **Run now**. Only the workspace owner can change or run them.
+- **How they're scheduled.** Each automation runs at most once per day (or week); the server records the period it last ran for. Two things ask what is due:
+  - the local server, every 30 seconds (`--no-automations` turns this off);
+  - the browser, when the app opens, every 5 minutes while it is open, and when the tab comes back into view. It sends its own clock, so times follow your timezone even on Vercel, whose servers run on UTC.
+- **Catching up.** If nothing was running at 8:00, the brief posts the next time the app or server checks that day. Missed days aren't replayed, and setting up at 21:00 doesn't post a morning brief at night.
+- **Text without a model.** No model is connected, so the messages are put together from your data by fixed rules. A model runtime would write them instead, through the same path.
+- **On Vercel** they only run while someone has the app open, and the demo database resets, so use **Run now** there.
+
+Code: `journal_os/automations.py` and the `automations` table in `journal_os/schema.sql`. Endpoints are listed in [HARNESS.md](HARNESS.md#endpoints).
+
+---
+
 ## Working vs. planned
 
 | Feature | Status |
@@ -207,7 +231,7 @@ Barnacle is a gold bubble in the bottom-right corner of every Journal OS view (p
 | Backend authorization, workspace roles, companion grants | **Working** (tested) |
 | Zine, School, Studio cards | **Open the existing modules** |
 | LLM interpretation | **Planned**: the adapter interface exists, but no provider is wired up |
-| Suggested and Autonomous-Sandbox autonomy modes, scheduled background runs | **Planned** (only Manual mode exists) |
+| Suggested and Autonomous-Sandbox autonomy modes | **Planned** (only Manual mode exists) |
 | Shared workspaces UI, invitations, mutual consent | **Planned** (backend memberships and roles exist; there is no UI) |
 | Cross-account companion play | **Disabled** until identity verification ships |
 | World module, device integration | **Planned** |
@@ -215,6 +239,7 @@ Barnacle is a gold bubble in the bottom-right corner of every Journal OS view (p
 | Channels view: channels, DMs, threads, @mentions, approval cards, live updates | **Working** ([HARNESS.md](HARNESS.md)); live updates are 3-second polling on Vercel |
 | Agents answering in channels | **Stand-in**: rule-based replies using the command bar's interpreter; no model is connected |
 | Barnacle floating companion (every view, context chips, approval cards in the panel) | **Working**; replies come from the stand-in |
+| Automations: morning brief, evening journal prompt, weekly review | **Working**; the text is put together from your data by fixed rules, not written by a model |
 | Model runtime (drivers, background runs, budgets) | **Planned** |
 | Agent budgets | **Stored only**: `monthly_budget_usd` is saved but nothing spends or enforces it until the runtime exists |
 

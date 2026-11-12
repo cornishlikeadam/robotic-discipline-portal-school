@@ -1398,6 +1398,9 @@ class JournalStore:
             elif action.startswith("agent."):
                 events.append({"id": r["id"], "type": "agent", "agent_id": target})
                 continue
+            elif action.startswith("automation."):
+                events.append({"id": r["id"], "type": "automation", "automation_id": target})
+                continue
             if event and self._can_see_channel(user_id, event["channel_id"]):
                 events.append({"id": r["id"], **event})
         cursor = rows[-1]["id"] if rows else int(after)

@@ -138,6 +138,7 @@ function showSignin() { $('#signin').hidden = false; $('#app').hidden = true; $(
 function signOut(expired = false) {
   if (typeof Harness !== 'undefined') Harness.leave();
   if (typeof Barnacle !== 'undefined') Barnacle.unmount();
+  if (typeof AutoTick !== 'undefined') AutoTick.stop();
   if (typeof LiveFeed !== 'undefined') LiveFeed.stopAll();
   S.token = null; S.user = null; store.del('token');
   showSignin();
@@ -158,6 +159,7 @@ async function enter() {
   S.selectedCompanion = S.selectedCompanion || (S.companions.find((c) => c.name === 'PATCH') || S.companions[0] || {}).id;
   renderDock();
   if (typeof Barnacle !== 'undefined') Barnacle.mount();
+  if (typeof AutoTick !== 'undefined') AutoTick.start();
   if (!location.hash) location.hash = '#planner'; else route();
 }
 

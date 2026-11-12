@@ -25,6 +25,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any, Dict, Optional, Tuple
 
 from journal_os import harness
+from journal_os.automations import AutomationService
 from journal_os.actions import ActionService, run_sandbox_activity
 from journal_os.registry import APP_REGISTRY
 from journal_os.store import AuthError, Forbidden, Invalid, JournalStore, NotFound
@@ -36,6 +37,7 @@ SSE = {"Content-Type": "text/event-stream; charset=utf-8", "Cache-Control": "no-
 STREAM_PATH = re.compile(r"/api/os/w/([\w-]+)/stream")
 STREAM_SECONDS = 25        # local server holds a stream open this long, then the client reconnects
 STREAM_POLL_SECONDS = 0.5  # how often an open stream checks the change feed
+AUTOMATION_TICK_SECONDS = 30  # local server: how often to look for due automations
 
 Response = Tuple[int, Dict[str, str], str]
 
@@ -79,12 +81,25 @@ class JournalOSApp:
         self.storage_mode = storage_mode or (mode if db_path is None else "durable")
         self.store = JournalStore(self.db_path)
         self.actions = ActionService(self.store)
+        self.automations = AutomationService(self.store)
         # One shared SQLite connection: serverless runtimes may call handle()
         # from several threads at once, so requests take turns.
         self._lock = threading.Lock()
 
     def close(self) -> None:
         self.store.close()
+
+    def tick_automations(self, now: Optional[str] = None) -> int:
+        """Run every due automation on this machine's clock. The local server
+        calls this from a background thread; it must never raise."""
+        with self._lock:
+            try:
+                return len(self.automations.run_due(now))
+            except Exception as exc:  # keep the ticker alive; the next tick retries
+                self.store.conn.rollback()
+                if not os.environ.get("JOURNAL_OS_QUIET"):
+                    print(f"automations: {exc}", flush=True)
+                return 0
 
     # ------------------------------------------------------------ routing
     def handle(self, method: str, raw_path: str, body: Optional[str] = None,
@@ -218,13 +233,23 @@ class JournalOSApp:
                 status = q.get("status", "pending")
                 return ok(200, s.list_approvals(uid, ws, None if status == "all" else status))
             if coll == "harness" and sub == "bootstrap" and method == "POST":
-                return ok(200, s.bootstrap_harness(uid, ws))
+                boot = s.bootstrap_harness(uid, ws)
+                self.automations.ensure_defaults(uid, ws, boot["agent"]["id"], boot["channel"]["id"], d.get("now"))
+                return ok(200, boot)
+            if coll == "automations":
+                if method == "GET" and not sub:
+                    return ok(200, self.automations.list(uid, ws, q.get("now")))
+                if method == "POST" and sub == "tick":
+                    # The browser's clock says what time it is for this person.
+                    # Only their own automations run, each at most once per period.
+                    s.require_role(uid, ws, "viewer")
+                    return ok(200, self.automations.run_due(d.get("now"), ws, owner_id=uid))
             if coll == "stream" and method == "GET":
                 # One batch, then the response ends. Hosts that can't hold a
                 # connection open (Vercel) degrade to polling via `retry`.
                 return 200, dict(SSE), sse_frames(s.list_changes(uid, ws, _after(q.get("after"))), retry=3000)
 
-        m = re.fullmatch(r"/api/os/(events|journal|memories|actions|channels|messages|approvals|agents)/([\w-]+)"
+        m = re.fullmatch(r"/api/os/(events|journal|memories|actions|channels|messages|approvals|agents|automations)/([\w-]+)"
                          r"(?:/([\w-]+))?", path)
         if m:
             kind, rid, verb = m.groups()
@@ -284,6 +309,11 @@ class JournalOSApp:
                     return ok(200, s.update_agent(uid, rid, d))
                 if method == "GET" and verb == "memory":
                     return ok(200, s.render_agent_memory(uid, rid))
+            if kind == "automations" and method == "POST":
+                if not verb:
+                    return ok(200, self.automations.update(uid, rid, d, d.get("now")))
+                if verb == "run":
+                    return ok(200, self.automations.run_now(uid, rid, d.get("now")))
         return ok(404, {"error": f"No route for {method} {path}"})
 
 
@@ -403,8 +433,16 @@ def main() -> None:
     parser.add_argument("--port", type=int, default=8090)
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--db", default=None, help="SQLite path (default: ./data/journal_os.db)")
+    parser.add_argument("--no-automations", action="store_true",
+                        help="don't run scheduled automations in the background (the browser still can)")
     args = parser.parse_args()
     app = JournalOSApp(db_path=args.db)
+    if not args.no_automations:
+        def ticker() -> None:
+            while True:
+                app.tick_automations()
+                time.sleep(AUTOMATION_TICK_SECONDS)
+        threading.Thread(target=ticker, name="automations", daemon=True).start()
     server = ThreadingHTTPServer((args.host, args.port), make_handler(app))  # daemon threads
     print(f"Journal OS on http://{args.host}:{args.port}/os/  (db: {app.db_path}, storage: {app.storage_mode})",
           flush=True)

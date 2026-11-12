@@ -67,12 +67,16 @@ All need `Authorization: Bearer <token>` from `POST /api/os/session`.
 | `POST /api/os/w/{ws}/agents` | owner | Create an agent: `{name, handle?, role, system_prompt, model, companion_id, resources}`. |
 | `GET` / `POST /api/os/agents/{id}` | viewer / owner | Read or update an agent. |
 | `GET /api/os/agents/{id}/memory` | viewer | The agent's `MEMORY.md`, rebuilt from approved memories. |
-| `POST /api/os/w/{ws}/harness/bootstrap` | owner | Create `#general` and the PATCH agent. Safe to call again. |
+| `POST /api/os/w/{ws}/harness/bootstrap` | owner | Create `#general`, the PATCH agent, its DM and the three default automations. Safe to call again. Send `{now}` (local time) so automations whose time has passed today don't post. |
 | `GET /api/os/w/{ws}/approvals` | viewer | Pending approvals in channels you can see (`?status=approved`, `rejected`, `failed` or `all`). |
 | `GET /api/os/approvals/{id}` | viewer | One approval. |
 | `POST /api/os/approvals/{id}/approve` | workspace owner or the agent's owner | Run it. An optional `{input: {...}}` edits values but can't switch the target event or companion. |
 | `POST /api/os/approvals/{id}/reject` | workspace owner or the agent's owner | Reject it. |
 | `GET /api/os/w/{ws}/stream?after={cursor}` | viewer | The live feed (below). |
+| `GET /api/os/w/{ws}/automations?now=` | viewer | The workspace's automations with `next_run`, `where` and the last run. |
+| `POST /api/os/w/{ws}/automations/tick` | viewer | `{now}`. Runs the caller's own automations that are due and haven't run this day or week. Returns what ran. |
+| `POST /api/os/automations/{id}` | owner | Change `{enabled, time_of_day, weekday}`. |
+| `POST /api/os/automations/{id}/run` | owner | `{now}`. Post it now; this counts as this period's run. |
 
 `POST /api/os/actions/{id}/approve` (the command bar's route) refuses agent proposals with 403. They can only be decided from their card, so the card and the proposal never disagree.
 
@@ -96,7 +100,7 @@ event: cursor
 data: {"cursor": 42}
 ```
 
-- `type` is `message`, `approval`, `channel` or `agent`. The client refetches what changed; events carry ids, not content.
+- `type` is `message`, `approval`, `channel`, `agent` or `automation`. The client refetches what changed; events carry ids, not content.
 - Every batch ends with a `cursor` event. Without `after`, the stream starts from now.
 - The feed reads the existing `audit_log`, which already records every write in order, so no new table was needed. Rows from channels you can't see are skipped.
 - **Local server:** each stream stays open for 25 seconds. It checks for changes every half second, sends a keepalive comment every 15 seconds, and the browser reconnects after 1 second.
@@ -113,6 +117,8 @@ To support this, the local server now handles each request on its own thread, so
   - approve runs once, reject changes nothing, edits apply, only the owner decides, viewers can't post, and the command bar can't approve agent proposals;
   - the stream's cursor and changes, private channels in the stream, and the stream requiring sign-in;
   - a real server process whose stream delivers while other requests (including a legacy route) still answer, with messages and decisions intact after a restart.
+- **`tests/test_automations.py`** (18 tests): scheduling, content, the evening draft's approval, permissions and the local ticker. See [JOURNAL_OS.md → Automations](JOURNAL_OS.md#automations).
+- **`scripts/automations_demo.py`**: moves the browser's clock to 8:05 and 20:05 and checks the brief, the evening draft in Barnacle, Run now and turning one off (10/10 checks).
 - **`scripts/harness_demo.py`**: a two-tab browser run in headless Chromium.
   - It covers @mention autocomplete, the pending card, the second tab updating live, approving there, the planner link, rejecting a card in a thread, the members dialog, a server restart, phone width and page errors.
   - It passed 14/14 checks on 2026-11-12.
