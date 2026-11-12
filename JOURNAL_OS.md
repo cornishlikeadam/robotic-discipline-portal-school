@@ -200,6 +200,24 @@ Barnacle is a gold bubble in the bottom-right corner of every Journal OS view (p
 - **Presence.** The bubble floats and pulses gently, and its badge shows how many approvals are waiting. When you select a sentence in the journal it offers "Want me to keep…?". On first visit it introduces itself; **Show me** (or **Demo** in the panel) types a sample request and sends it, producing a real approval card to approve or reject. If the workspace has no agent yet, the demo sets up PATCH first.
 - **Motion** is turned off for people who ask their system for reduced motion.
 
+### On a phone
+
+Barnacle is built phone first. It behaves like a video that keeps playing in a corner while you browse:
+
+- **The bubble** is a 56 px touch target in the bottom-right corner. Drag it to any corner and it snaps there and stays after a reload. **Move Barnacle to the left/right** in the chat does the same without dragging. A top corner sits below the top bar, so it never covers Sign out.
+- **It keeps out of the way.** It tucks to the screen edge while you scroll down and comes back when you stop. It hides while you type anywhere else, because the keyboard has already taken half the screen.
+- **The chat is a bottom sheet**: full width, rounded top, with the agent's name, Minimize and Close in the header. It rides above the on-screen keyboard, and the page doesn't scroll behind it.
+- **The mini player.** Changing views while the sheet is open shrinks it to a small card with the agent's name, its latest line and a count of changes waiting. The card stays on every view; tap it to reopen the chat. Minimize does the same on demand, and the mode is remembered across reloads.
+- **States.**
+  - Empty: "No messages yet", with three example requests.
+  - Thinking: your message appears at once, with "PATCH is thinking" under it.
+  - Pending: a gold "1 waiting" pill in the header jumps to the first card; cards have a gold outline and 44 px buttons.
+  - Failed send: your text is kept, with **Try again**.
+  - Model failure: the stand-in answers, and the reply carries a quiet notice.
+- **On a wider screen** the chat is a side panel on the bubble's side, and it stays open as you change views.
+- **Limit.** A web page can't float over other apps or the home screen the way a picture-in-picture video does. Barnacle stays with you everywhere inside Journal OS.
+- **Checks.** `scripts/barnacle_phone_demo.py` runs 17 checks at 390 × 844 with touch: drag and snap, the sheet, the mini player across views, each state, hiding while typing, tucking on a real touch swipe, reduced motion, and the desktop side panel.
+
 ---
 
 ## Automations
