@@ -19,6 +19,7 @@ from skeleton.workspace_server import WorkspaceApp
 from apps.dataroom.server import DataRoomApp
 from apps.vc_directory.server import VCDirectoryApp
 from apps.studio.blueprint_studio import StudioBlueprintApp
+from journal_os.server import JournalOSApp
 
 REPO_ROOT = pathlib.Path(__file__).resolve().parent.parent
 SEED_DIR = REPO_ROOT / "seed"
@@ -38,6 +39,14 @@ _workspace_app: Optional[WorkspaceApp] = None
 _dataroom_app: Optional[DataRoomApp] = None
 _directory_app: Optional[VCDirectoryApp] = None
 _studio_app: Optional[StudioBlueprintApp] = None
+_journal_app: Optional[JournalOSApp] = None
+
+
+def get_journal_app() -> JournalOSApp:
+    global _journal_app
+    if _journal_app is None:
+        _journal_app = JournalOSApp()
+    return _journal_app
 
 
 def get_apps() -> Tuple[WorkspaceApp, DataRoomApp, VCDirectoryApp, StudioBlueprintApp]:
@@ -103,10 +112,15 @@ def inject_nav(page_html: str) -> str:
 
 
 def route_request(
-    method: str, path: str, body: Optional[str] = None, ip_address: str = "127.0.0.1"
+    method: str, path: str, body: Optional[str] = None, ip_address: str = "127.0.0.1",
+    headers: Optional[Dict[str, str]] = None,
 ) -> Tuple[int, Dict[str, str], str]:
     if method == "OPTIONS":
         return 200, with_cors({"Content-Type": "text/plain"}), "OK"
+
+    # Journal OS API (bearer-token auth; no wildcard CORS on authenticated data)
+    if urllib.parse.urlparse(path).path.startswith("/api/os/"):
+        return get_journal_app().handle(method, path, body, headers or {})
 
     workspace_app, dataroom_app, directory_app, studio_app = get_apps()
     parsed = urllib.parse.urlparse(path)
@@ -230,7 +244,7 @@ class handler(BaseHTTPRequestHandler):
 
     def do_GET(self) -> None:
         ip = self.headers.get("x-forwarded-for", self.client_address[0] if self.client_address else "127.0.0.1")
-        status, headers, resp_body = route_request("GET", self.path, ip_address=ip)
+        status, headers, resp_body = route_request("GET", self.path, ip_address=ip, headers=dict(self.headers))
         self.send_response(status)
         for k, v in headers.items():
             self.send_header(k, v)
@@ -241,7 +255,7 @@ class handler(BaseHTTPRequestHandler):
         length = int(self.headers.get("Content-Length", "0"))
         raw = self.rfile.read(length).decode("utf-8") if length > 0 else "{}"
         ip = self.headers.get("x-forwarded-for", self.client_address[0] if self.client_address else "127.0.0.1")
-        status, headers, resp_body = route_request("POST", self.path, raw, ip_address=ip)
+        status, headers, resp_body = route_request("POST", self.path, raw, ip_address=ip, headers=dict(self.headers))
         self.send_response(status)
         for k, v in headers.items():
             self.send_header(k, v)
@@ -250,7 +264,7 @@ class handler(BaseHTTPRequestHandler):
 
     def do_DELETE(self) -> None:
         ip = self.headers.get("x-forwarded-for", self.client_address[0] if self.client_address else "127.0.0.1")
-        status, headers, resp_body = route_request("DELETE", self.path, ip_address=ip)
+        status, headers, resp_body = route_request("DELETE", self.path, ip_address=ip, headers=dict(self.headers))
         self.send_response(status)
         for k, v in headers.items():
             self.send_header(k, v)
