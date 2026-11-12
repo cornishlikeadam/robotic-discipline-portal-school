@@ -18,10 +18,13 @@ import os
 import pathlib
 import re
 import threading
+import time
 import urllib.parse
-from http.server import BaseHTTPRequestHandler, HTTPServer
+from concurrent.futures import ThreadPoolExecutor
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any, Dict, Optional, Tuple
 
+from journal_os import harness
 from journal_os.actions import ActionService, run_sandbox_activity
 from journal_os.registry import APP_REGISTRY
 from journal_os.store import AuthError, Forbidden, Invalid, JournalStore, NotFound
@@ -29,8 +32,34 @@ from journal_os.store import AuthError, Forbidden, Invalid, JournalStore, NotFou
 REPO_ROOT = pathlib.Path(__file__).resolve().parent.parent
 STATIC_DIR = REPO_ROOT / "os"
 JSON = {"Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store"}
+SSE = {"Content-Type": "text/event-stream; charset=utf-8", "Cache-Control": "no-store", "X-Accel-Buffering": "no"}
+STREAM_PATH = re.compile(r"/api/os/w/([\w-]+)/stream")
+STREAM_SECONDS = 25        # local server holds a stream open this long, then the client reconnects
+STREAM_POLL_SECONDS = 0.5  # how often an open stream checks the change feed
 
 Response = Tuple[int, Dict[str, str], str]
+
+
+def _bearer(headers: Optional[Dict[str, str]]) -> Optional[str]:
+    auth = (headers or {}).get("authorization") or (headers or {}).get("Authorization") or ""
+    return auth[7:].strip() if auth.lower().startswith("bearer ") else None
+
+
+def _after(value: Optional[str]) -> Optional[int]:
+    return int(value) if value and str(value).isdigit() else None
+
+
+def sse_frames(feed: Dict[str, Any], retry: Optional[int] = None) -> str:
+    """Server-Sent Events text for one batch from JournalStore.list_changes.
+
+    Every batch ends with a `cursor` event whose id is the feed cursor, so the
+    client resumes from there even when every row was filtered out.
+    """
+    parts = [f"retry: {int(retry)}\n\n"] if retry else []
+    for event in feed["events"]:
+        parts.append(f"id: {event['id']}\nevent: change\ndata: {json.dumps(event)}\n\n")
+    parts.append(f"id: {feed['cursor']}\nevent: cursor\ndata: {json.dumps({'cursor': feed['cursor']})}\n\n")
+    return "".join(parts)
 
 
 def default_db_path() -> Tuple[str, str]:
@@ -67,8 +96,7 @@ class JournalOSApp:
             data = json.loads(body) if body else {}
         except json.JSONDecodeError:
             return self._json(400, {"error": "Body must be JSON."})
-        auth = (headers or {}).get("authorization") or (headers or {}).get("Authorization") or ""
-        token = auth[7:].strip() if auth.lower().startswith("bearer ") else None
+        token = _bearer(headers)
         try:
             with self._lock:
                 return self._route(method, path, query, data, token)
@@ -83,6 +111,32 @@ class JournalOSApp:
 
     def _json(self, status: int, payload: Any) -> Response:
         return status, dict(JSON), json.dumps(payload)
+
+    # ------------------------------------------------------- live updates
+    @staticmethod
+    def stream_request(raw_path: str) -> Optional[Tuple[str, Optional[int]]]:
+        """(workspace_id, after) when raw_path is the change stream, else None."""
+        parsed = urllib.parse.urlparse(raw_path)
+        m = STREAM_PATH.fullmatch(parsed.path.rstrip("/"))
+        if not m:
+            return None
+        return m.group(1), _after(urllib.parse.parse_qs(parsed.query).get("after", [""])[-1])
+
+    def poll_changes(self, headers: Optional[Dict[str, str]], workspace_id: str,
+                     after: Optional[int]) -> Tuple[int, Dict[str, Any]]:
+        """One authenticated read of the change feed, used by the streaming handler."""
+        try:
+            with self._lock:
+                user = self.store.user_for_token(_bearer(headers))
+                return 200, self.store.list_changes(user["id"], workspace_id, after)
+        except AuthError as exc:
+            return 401, {"error": str(exc)}
+        except Forbidden as exc:
+            return 403, {"error": str(exc)}
+        except NotFound as exc:
+            return 404, {"error": str(exc)}
+        except (Invalid, ValueError) as exc:
+            return 400, {"error": str(exc)}
 
     def _route(self, method: str, path: str, q: Dict[str, str], d: Dict[str, Any], token: Optional[str]) -> Response:
         s, a, ok = self.store, self.actions, self._json
@@ -139,8 +193,39 @@ class JournalOSApp:
                 return ok(200, s.export_planner(uid, ws))
             if coll == "import" and method == "POST":
                 return ok(200, s.import_planner(uid, ws, d))
+            # ---- agent harness: channels, agents, approvals, live updates
+            if coll == "channels":
+                if method == "GET":
+                    return ok(200, s.list_channels(uid, ws, q.get("archived") == "1"))
+                if method == "POST":
+                    agent_ids = d.get("agent_ids") or []
+                    known = {x["id"] for x in s.list_agents(uid, ws)}
+                    if not isinstance(agent_ids, list) or set(agent_ids) - known:
+                        raise Invalid("agent_ids must be agents in this workspace.")
+                    ch = s.create_channel(uid, ws, d.get("name", ""), d.get("type", "public"),
+                                          d.get("description", ""), d.get("instructions", ""))
+                    for agent_id in agent_ids:
+                        s.add_channel_member(uid, ch["id"], agent_id, "agent")
+                    return ok(201, s.get_channel(uid, ch["id"]))
+            if coll == "dms" and method == "POST":
+                return ok(200, s.open_dm(uid, ws, d.get("member_id", ""), d.get("member_type", "agent")))
+            if coll == "agents":
+                if method == "GET":
+                    return ok(200, s.list_agents(uid, ws, q.get("archived") == "1"))
+                if method == "POST":
+                    return ok(201, s.create_agent(uid, ws, d))
+            if coll == "approvals" and method == "GET":
+                status = q.get("status", "pending")
+                return ok(200, s.list_approvals(uid, ws, None if status == "all" else status))
+            if coll == "harness" and sub == "bootstrap" and method == "POST":
+                return ok(200, s.bootstrap_harness(uid, ws))
+            if coll == "stream" and method == "GET":
+                # One batch, then the response ends. Hosts that can't hold a
+                # connection open (Vercel) degrade to polling via `retry`.
+                return 200, dict(SSE), sse_frames(s.list_changes(uid, ws, _after(q.get("after"))), retry=3000)
 
-        m = re.fullmatch(r"/api/os/(events|journal|memories|actions)/([\w-]+)(?:/([\w-]+))?", path)
+        m = re.fullmatch(r"/api/os/(events|journal|memories|actions|channels|messages|approvals|agents)/([\w-]+)"
+                         r"(?:/([\w-]+))?", path)
         if m:
             kind, rid, verb = m.groups()
             if kind == "events":
@@ -169,6 +254,36 @@ class JournalOSApp:
                     return ok(200, a.approve(uid, rid, d.get("payload")))
                 if verb == "reject":
                     return ok(200, a.reject(uid, rid))
+            if kind == "channels":
+                if method == "GET" and not verb:
+                    return ok(200, s.get_channel(uid, rid))
+                if verb == "messages" and method == "GET":
+                    return ok(200, s.list_messages(uid, rid, q.get("thread") or None, int(q.get("limit") or 100)))
+                if verb == "messages" and method == "POST":
+                    msg = s.post_message(uid, rid, d.get("content", ""), d.get("thread_id"), d.get("context"))
+                    replies = harness.respond_to(s, uid, msg, d.get("now"))
+                    return ok(201, {"message": msg, "replies": replies})
+                if verb == "members" and method == "POST":
+                    return ok(200, s.add_channel_member(uid, rid, d.get("member_id", ""), d.get("member_type", "agent"),
+                                                        d.get("role", "member")))
+                if verb == "members" and method == "DELETE":
+                    return ok(200, s.remove_channel_member(uid, rid, d.get("member_id", "")))
+                if verb == "archive" and method == "POST":
+                    return ok(200, s.archive_channel(uid, rid))
+            if kind == "messages" and method == "GET" and not verb:
+                return ok(200, s.get_message(uid, rid))
+            if kind == "approvals":
+                if method == "GET" and not verb:
+                    return ok(200, s.get_approval(uid, rid))
+                if method == "POST" and verb in ("approve", "reject"):
+                    return ok(200, a.decide_tool_call(uid, rid, verb == "approve", d.get("input") or None))
+            if kind == "agents":
+                if method == "GET" and not verb:
+                    return ok(200, s.get_agent(uid, rid))
+                if method == "POST" and not verb:
+                    return ok(200, s.update_agent(uid, rid, d))
+                if method == "GET" and verb == "memory":
+                    return ok(200, s.render_agent_memory(uid, rid))
         return ok(404, {"error": f"No route for {method} {path}"})
 
 
@@ -186,13 +301,20 @@ def serve_static(path: str) -> Optional[Response]:
 
 def make_handler(app: JournalOSApp):
     legacy = None
+    # The server is threaded so a live stream can stay open. The older Portal
+    # School apps keep SQLite connections that only work on the thread that
+    # opened them, so every legacy request runs on this one worker thread.
+    legacy_pool = ThreadPoolExecutor(max_workers=1, thread_name_prefix="portal-legacy")
 
-    def legacy_route(method: str, path: str, body: Optional[str]) -> Response:
+    def legacy_call(method: str, path: str, body: Optional[str]) -> Response:
         nonlocal legacy
         if legacy is None:
             from api import index as legacy_mod  # existing Portal School gateway
             legacy = legacy_mod
         return legacy.route_request(method, path, body)
+
+    def legacy_route(method: str, path: str, body: Optional[str]) -> Response:
+        return legacy_pool.submit(legacy_call, method, path, body).result()
 
     class Handler(BaseHTTPRequestHandler):
         def _send(self, status: int, headers: Dict[str, str], body: Any) -> None:
@@ -204,7 +326,44 @@ def make_handler(app: JournalOSApp):
             self.end_headers()
             self.wfile.write(data)
 
+        def _emit(self, text: str) -> None:
+            self.wfile.write(text.encode("utf-8"))
+            self.wfile.flush()
+
+        def _stream(self, workspace_id: str, after: Optional[int]) -> None:
+            """Hold a Server-Sent Events stream open for STREAM_SECONDS."""
+            headers = dict(self.headers)
+            status, feed = app.poll_changes(headers, workspace_id, after)
+            if status != 200:
+                return self._send(status, dict(JSON), json.dumps(feed))
+            self.close_connection = True
+            self.send_response(200)
+            for key, value in SSE.items():
+                self.send_header(key, value)
+            self.end_headers()
+            try:
+                self._emit(sse_frames(feed, retry=1000))
+                cursor, beat = feed["cursor"], time.monotonic()
+                deadline = beat + STREAM_SECONDS
+                while time.monotonic() < deadline:
+                    time.sleep(STREAM_POLL_SECONDS)
+                    status, feed = app.poll_changes(headers, workspace_id, cursor)
+                    if status != 200:
+                        return  # signed out or removed from the workspace: end the stream
+                    if feed["events"] or feed["cursor"] != cursor:
+                        self._emit(sse_frames(feed))
+                        cursor, beat = feed["cursor"], time.monotonic()
+                    elif time.monotonic() - beat > 15:
+                        self._emit(": keepalive\n\n")
+                        beat = time.monotonic()
+            except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError):
+                return  # the browser closed the tab or switched views
+
         def _dispatch(self, method: str) -> None:
+            if method == "GET":
+                target = app.stream_request(self.path)
+                if target:
+                    return self._stream(*target)
             length = int(self.headers.get("Content-Length") or 0)
             body = self.rfile.read(length).decode("utf-8") if length else None
             path = urllib.parse.urlparse(self.path).path
@@ -246,7 +405,7 @@ def main() -> None:
     parser.add_argument("--db", default=None, help="SQLite path (default: ./data/journal_os.db)")
     args = parser.parse_args()
     app = JournalOSApp(db_path=args.db)
-    server = HTTPServer((args.host, args.port), make_handler(app))
+    server = ThreadingHTTPServer((args.host, args.port), make_handler(app))  # daemon threads
     print(f"Journal OS on http://{args.host}:{args.port}/os/  (db: {app.db_path}, storage: {app.storage_mode})",
           flush=True)
     try:

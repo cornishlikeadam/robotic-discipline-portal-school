@@ -92,6 +92,7 @@ const ICONS = {
   world: ['....kkkk....', '..kkmmcckk..', '.kmmmccccck.', '.kmmcccmmck.', 'kccccccmmmck', 'kcccmmccccck', 'kccmmmmcccck', 'kcccmmccmmck', '.kccccccmmk.', '.kcccccccck.', '..kkcccckk..', '....kkkk....'],
   autonomy: ['.....kk.....', '..k.kssk.k..', '.ksksssskskk'.slice(0, 12), '..kssssssk..', '.ksssddsssk.', 'kssssddssssk', 'kssssddssssk', '.ksssddsssk.', '..kssssssk..', '.ksksssskskk'.slice(0, 12), '..k.kssk.k..', '.....kk.....'],
   collab: ['............', '..kkk...kkk.', '.kaaak.kccck', '.kaaak.kccck', '..kkk...kkk.', '.kaaaaakcccck'.slice(0, 12), 'kaaaaakccccc', 'kaaaaakccccc', 'kaaaaakccccc', '............', '............', '............'],
+  channels: ['............', '.kkkkkkkkkk.', 'kwwwwwwwwwwk', 'kwwwkwwkwwwk', 'kwkkkkkkkkwk', 'kwwwkwwkwwwk', 'kwwwkwwkwwwk', 'kwkkkkkkkkwk', 'kwwwkwwkwwwk', 'kwwwwwwwwaak', '.kkkkkkkkkk.', '..kk........'],
   device: ['..kkkkkkkk..', '.kssssssssk.', '.kskkkkkksk.', '.kskggggksk.', '.kskgkkgksk.', '.kskggggksk.', '.kskkkkkksk.', '.kssssssssk.', '.kskkssppsk.', '.kssssssssk.', '.kssssssssk.', '..kkkkkkkk..'],
 };
 const PORTRAIT = {
@@ -135,6 +136,9 @@ async function boot() {
 function showSignin() { $('#signin').hidden = false; $('#app').hidden = true; $('#sign-out').hidden = true; $('#who').textContent = ''; $('#handle').focus(); }
 
 function signOut(expired = false) {
+  if (typeof Harness !== 'undefined') Harness.leave();
+  if (typeof Barnacle !== 'undefined') Barnacle.unmount();
+  if (typeof LiveFeed !== 'undefined') LiveFeed.stopAll();
   S.token = null; S.user = null; store.del('token');
   showSignin();
   if (expired) toast('Session ended — sign in again.', true);
@@ -153,12 +157,13 @@ async function enter() {
   S.companions = (await guard(() => api('GET', wsPath('/companions')))) || [];
   S.selectedCompanion = S.selectedCompanion || (S.companions.find((c) => c.name === 'PATCH') || S.companions[0] || {}).id;
   renderDock();
+  if (typeof Barnacle !== 'undefined') Barnacle.mount();
   if (!location.hash) location.hash = '#planner'; else route();
 }
 
 /* ---------------------------------------------------------------- dock + routing */
 const STATUS_LABEL = { live: 'Live', 'live-partial': 'Partly live', existing: 'Existing module', planned: 'Planned' };
-const THEME = { signal: 'var(--lime)', paper: 'var(--paper)', phosphor: 'var(--moss)', candy: 'var(--pink)', riso: 'var(--pink)', chalk: 'var(--cyan)', blueprint: 'var(--blue)', moss: 'var(--moss)', steel: 'var(--steel)' };
+const THEME = { signal: 'var(--lime)', paper: 'var(--paper)', phosphor: 'var(--moss)', candy: 'var(--pink)', riso: 'var(--pink)', chalk: 'var(--cyan)', blueprint: 'var(--blue)', moss: 'var(--moss)', steel: 'var(--steel)', beacon: 'var(--amber)' };
 
 function renderDock() {
   $('#dock').innerHTML = S.registry.map((a) => {
@@ -178,8 +183,12 @@ function route() {
   const pv = $('#preview');
   if (pv.classList.contains('done') && pv.dataset.route !== id) pv.hidden = true;
   $$('#dock .card').forEach((c) => c.setAttribute('aria-current', c.dataset.app === id ? 'page' : 'false'));
-  const views = { planner: viewPlanner, journal: viewJournal, companion: viewCompanion, together: viewTogether };
+  const harnessReady = typeof Harness !== 'undefined';
+  if (id !== 'channels' && harnessReady) Harness.leave();
+  const views = { planner: viewPlanner, journal: viewJournal, companion: viewCompanion, together: viewTogether,
+    channels: harnessReady ? () => Harness.view() : () => viewStatus(id) };
   const fn = views[id] || (() => viewStatus(id));
+  if (typeof Barnacle !== 'undefined') Barnacle.onRoute(id);
   fn();
 }
 
@@ -503,6 +512,7 @@ function openEventDialog(ev, defaults = {}) {
   const start = e.start_at || localIso(new Date());
   const dur = ev ? minutesBetween(ev.start_at, ev.end_at) : 60;
   const isOcc = ev && ev.occurrence_of && ev.recurrence !== 'none';
+  if (ev && ev.id) S.lastEvent = { id: ev.id, title: ev.title }; // Barnacle can offer help with it
   f.innerHTML = `<h2 id="event-dialog-title">${ev ? 'Edit' : 'New'} ${e.calendar === 'companion' ? 'companion activity' : 'event'}</h2>
     ${isOcc ? '<p class="muted">This repeats. Changes apply to the whole series.</p>' : ''}
     ${e.calendar === 'companion' ? `<p class="muted">Companion sandbox calendar · ${esc((e.participants || []).join(' & '))}. Separate from your personal schedule.</p>` : ''}
@@ -762,4 +772,5 @@ function viewStatus(id) {
   $('.status-card .pix').style.cssText = 'width:96px;height:96px';
 }
 
-boot();
+// Start after every deferred script (os.js, harness.js) has run.
+document.addEventListener('DOMContentLoaded', boot);

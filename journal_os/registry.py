@@ -20,6 +20,10 @@ APP_REGISTRY = [
      "blurb": "Companion-to-companion sandbox sessions run now. Cross-account play is disabled until "
               "identity verification ships.",
      "permissions": ["companion_calendar:propose"]},
+    {"id": "channels", "name": "Channels", "status": "live-partial", "route": "#channels", "theme": "beacon",
+     "blurb": "Slack-style channels and DMs with your agents. Agents answer with a rule-based stand-in until a "
+              "model is connected, and every change they ask for waits on an approval card.",
+     "permissions": ["channels:post", "approvals:decide(owner)"]},
     {"id": "zine", "name": "Zine", "status": "existing", "route": "/zine", "theme": "riso",
      "blurb": "The original Stage-1 zine terminal view from the Portal School app."},
     {"id": "school", "name": "School", "status": "existing", "route": "/gamified#map", "theme": "chalk",

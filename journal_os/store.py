@@ -153,7 +153,15 @@ class JournalStore:
         self.conn: sqlite3.Connection = self.kernel.conn
         self.conn.execute("PRAGMA journal_mode=WAL") if db_path != ":memory:" else None
         self.conn.executescript(SCHEMA_PATH.read_text(encoding="utf-8"))
+        # Columns added after a table first shipped. CREATE IF NOT EXISTS
+        # can't add them to an existing database, so add them here.
+        self._ensure_column("messages", "context_json", "TEXT NOT NULL DEFAULT '{}'")
         self.conn.commit()
+
+    def _ensure_column(self, table: str, column: str, decl: str) -> None:
+        cols = {r[1] for r in self.conn.execute(f"PRAGMA table_info({table})").fetchall()}
+        if column not in cols:
+            self.conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {decl}")
 
     def close(self) -> None:
         self.conn.close()
@@ -735,7 +743,14 @@ class JournalStore:
         out = dict(ch)
         out["member_count"] = self._one("SELECT COUNT(*) AS n FROM channel_members WHERE channel_id = ?",
                                         (ch["id"],))["n"]
-        out["is_member"] = bool(self._membership(ch["id"], user_id))
+        mine = self._membership(ch["id"], user_id)
+        out["is_member"] = bool(mine)
+        out["my_role"] = mine["role"] if mine else None
+        if ch["type"] == "dm":
+            other = self._one("SELECT member_id, member_type FROM channel_members WHERE channel_id = ? AND member_id != ?",
+                              (ch["id"], user_id))
+            out["dm_with"] = ({**other, "name": self._member_name(other["member_id"], other["member_type"])}
+                              if other else None)
         return out
 
     def _insert_channel(self, user_id: str, workspace_id: str, name: str, ctype: str, description: str,
@@ -1042,9 +1057,15 @@ class JournalStore:
         out = dict(row)
         out["mentions"] = json.loads(out.pop("mentions_json") or "[]")
         out["tool_calls"] = json.loads(out.pop("tool_calls_json") or "[]")
+        out["context"] = json.loads(out.pop("context_json", None) or "{}")
         out["author_name"] = self._member_name(out["author_id"], out["author_type"])
         if out["thread_id"] is None:
             out["reply_count"] = self._one("SELECT COUNT(*) AS n FROM messages WHERE thread_id = ?", (out["id"],))["n"]
+        if out["tool_calls"]:
+            # Current decision state for each card (the tool_calls list keeps what was first asked).
+            out["approvals"] = [self._approval_out(r) for r in
+                                self._all("SELECT * FROM approvals WHERE message_id = ? ORDER BY created_at, rowid",
+                                          (out["id"],))]
         return out
 
     def _thread_root(self, channel_id: str, thread_id: Optional[str]) -> Optional[str]:
@@ -1071,15 +1092,49 @@ class JournalStore:
     def _insert_message(self, row: Dict[str, Any]) -> None:
         self.conn.execute(
             "INSERT INTO messages (id, workspace_id, channel_id, thread_id, author_id, author_type, content,"
-            " mentions_json, tool_calls_json, approval_status, hop, created_at) VALUES (:id, :workspace_id,"
-            " :channel_id, :thread_id, :author_id, :author_type, :content, :mentions_json, :tool_calls_json,"
-            " :approval_status, :hop, :created_at)",
-            row,
+            " mentions_json, tool_calls_json, context_json, approval_status, hop, created_at) VALUES (:id,"
+            " :workspace_id, :channel_id, :thread_id, :author_id, :author_type, :content, :mentions_json,"
+            " :tool_calls_json, :context_json, :approval_status, :hop, :created_at)",
+            {"context_json": "{}", **row},
         )
 
+    CONTEXT_VIEWS = ("planner", "journal", "companion", "together", "channels")
+
+    def _clean_context(self, user_id: str, workspace_id: str, context: Any) -> Dict[str, Any]:
+        """What the person was looking at when they wrote: a view, one journal
+        entry or event, and optionally some selected text. Titles are read from
+        the database (with the usual permission checks), never trusted from the client."""
+        if not context:
+            return {}
+        if not isinstance(context, dict):
+            raise Invalid("context must be an object.")
+        out: Dict[str, Any] = {}
+        if context.get("view") in self.CONTEXT_VIEWS:
+            out["view"] = context["view"]
+        kind, ref = context.get("kind"), context.get("id")
+        if kind == "journal_entry" and ref:
+            entry = self.get_entry(user_id, str(ref))
+            if entry["workspace_id"] != workspace_id:
+                raise Invalid("Context must come from this workspace.")
+            out.update(kind=kind, id=entry["id"], title=entry["title"])
+        elif kind == "event" and ref:
+            event = self.get_event(user_id, str(ref))
+            if event["workspace_id"] != workspace_id:
+                raise Invalid("Context must come from this workspace.")
+            out.update(kind=kind, id=event["id"], title=event["title"], start_at=event["start_at"])
+        elif kind:
+            raise Invalid("context kind must be journal_entry or event.")
+        selection = " ".join(str(context.get("selection") or "").split())
+        if selection:
+            out["selection"] = selection[:500]
+        return out
+
     def post_message(self, user_id: str, channel_id: str, content: str,
-                     thread_id: Optional[str] = None) -> Dict[str, Any]:
-        """A person posts. Posting in a public or agent-room channel joins it."""
+                     thread_id: Optional[str] = None, context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        """A person posts. Posting in a public or agent-room channel joins it.
+
+        `context` (optional) records what they were looking at; see _clean_context.
+        """
         ch = self._require_channel(user_id, channel_id, "editor")
         if ch["archived_at"]:
             raise Invalid("Channel is archived.")
@@ -1087,6 +1142,7 @@ class JournalStore:
         if not content:
             raise Invalid("Message is empty.")
         root = self._thread_root(channel_id, thread_id)
+        clean_context = self._clean_context(user_id, ch["workspace_id"], context)
         member = self._membership(channel_id, user_id)
         if member and member["role"] == "observer":
             raise Forbidden("Observers can read this channel but not post.")
@@ -1095,7 +1151,8 @@ class JournalStore:
         row = {"id": _id("msg"), "workspace_id": ch["workspace_id"], "channel_id": channel_id, "thread_id": root,
                "author_id": user_id, "author_type": "human", "content": content[:8000],
                "mentions_json": json.dumps(self._mentions(channel_id, content)), "tool_calls_json": "[]",
-               "approval_status": "none", "hop": 0, "created_at": utc_now()}
+               "context_json": json.dumps(clean_context), "approval_status": "none", "hop": 0,
+               "created_at": utc_now()}
         self._insert_message(row)
         self.audit(ch["workspace_id"], user_id, "message.post", "message", row["id"],
                    {"channel_id": channel_id, "author_type": "human"})
@@ -1266,6 +1323,14 @@ class JournalStore:
         msg = self._one("SELECT channel_id FROM messages WHERE id = ?", (row["message_id"],))
         out["channel_id"] = msg["channel_id"] if msg else None
         out["summary"] = _tool_summary(out["agent_name"], out["tool_name"], out["tool_input"])
+        out["decided_by_name"] = self._member_name(row["decided_by"], "human") if row["decided_by"] else None
+        event_id = out["tool_input"].get("event_id")
+        if event_id:  # what the card is about, e.g. which event a move or delete targets
+            out["target"] = self._one("SELECT id, title, start_at FROM events WHERE id = ?", (event_id,))
+        if out["tool_name"] == "post_message":
+            ch = self._one("SELECT name, type FROM channels WHERE id = ?", (out["tool_input"].get("channel_id"),))
+            # Name private targets only as private: viewers of this card may not be members there.
+            out["target_channel"] = (ch["name"] if ch["type"] in OPEN_CHANNEL_TYPES else "a private channel") if ch else None
         return out
 
     def get_approval(self, user_id: str, approval_id: str) -> Dict[str, Any]:
@@ -1288,6 +1353,55 @@ class JournalStore:
             sql += " AND a.status = ?"
             args.append(status)
         return [self._approval_out(r) for r in self._all(sql + " ORDER BY a.created_at, a.rowid", tuple(args))]
+
+    # ------------------------------------------------------- change feed
+    # The audit log already records every write in order, so it doubles as
+    # the live-update feed: clients ask for rows after the last id they saw.
+    def _can_see_channel(self, user_id: str, channel_id: Optional[str]) -> bool:
+        if not channel_id:
+            return False
+        try:
+            self._require_channel(user_id, channel_id)
+            return True
+        except (NotFound, Forbidden):
+            return False
+
+    def list_changes(self, user_id: str, workspace_id: str, after: Optional[int] = None,
+                     limit: int = 200) -> Dict[str, Any]:
+        """Harness changes after audit id `after` that this user may see.
+
+        With no `after`, returns no events and the current cursor ("start from
+        now"). The cursor advances past rows that were filtered out, so a
+        client never asks for them again.
+        """
+        self.require_role(user_id, workspace_id, "viewer")
+        if after is None:
+            row = self._one("SELECT COALESCE(MAX(id), 0) AS n FROM audit_log")
+            return {"events": [], "cursor": row["n"]}
+        rows = self._all("SELECT id, action, target_id, detail_json FROM audit_log WHERE id > ? AND workspace_id = ?"
+                         " ORDER BY id LIMIT ?", (int(after), workspace_id, int(limit)))
+        events: List[Dict[str, Any]] = []
+        for r in rows:
+            action, target = r["action"], r["target_id"]
+            detail = json.loads(r["detail_json"] or "{}")
+            event: Optional[Dict[str, Any]] = None
+            if action == "message.post":
+                event = {"type": "message", "channel_id": detail.get("channel_id"), "message_id": target}
+            elif action.startswith("approval."):
+                ap = self._one("SELECT a.message_id, a.status, m.channel_id FROM approvals a JOIN messages m"
+                               " ON m.id = a.message_id WHERE a.id = ?", (target,))
+                if ap:
+                    event = {"type": "approval", "channel_id": ap["channel_id"], "message_id": ap["message_id"],
+                             "approval_id": target, "status": ap["status"]}
+            elif action.startswith("channel."):
+                event = {"type": "channel", "channel_id": target}
+            elif action.startswith("agent."):
+                events.append({"id": r["id"], "type": "agent", "agent_id": target})
+                continue
+            if event and self._can_see_channel(user_id, event["channel_id"]):
+                events.append({"id": r["id"], **event})
+        cursor = rows[-1]["id"] if rows else int(after)
+        return {"events": events, "cursor": cursor}
 
     def require_approver(self, user_id: str, approval: Dict[str, Any]) -> None:
         """Only the workspace owner or the agent's owner decides an agent's tool call."""
