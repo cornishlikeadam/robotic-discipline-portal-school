@@ -272,6 +272,23 @@ class SessionTokenTests(unittest.TestCase):
         st.close()
 
 
+class ConcurrencyTest(unittest.TestCase):
+    def test_parallel_requests_from_many_threads(self):
+        import concurrent.futures as cf
+        app = JournalOSApp(db_path=":memory:")
+        try:
+            _, _, body = app.handle("POST", "/api/os/session", json.dumps({"handle": "kj"}))
+            s = json.loads(body)
+            hdr = {"Authorization": "Bearer " + s["token"]}
+            ws = s["workspaces"][0]["id"]
+            paths = [f"/api/os/w/{ws}/events", f"/api/os/w/{ws}/journal", "/api/os/me"] * 20
+            with cf.ThreadPoolExecutor(12) as ex:
+                codes = list(ex.map(lambda p: app.handle("GET", p, None, hdr)[0], paths))
+            self.assertEqual(set(codes), {200})
+        finally:
+            app.close()
+
+
 class SandboxTests(Base):
     def test_companion_session_runs_without_touching_personal_data(self):
         comp = self.store.list_companions(self.uid, self.ws)[0]

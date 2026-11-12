@@ -17,6 +17,7 @@ import mimetypes
 import os
 import pathlib
 import re
+import threading
 import urllib.parse
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from typing import Any, Dict, Optional, Tuple
@@ -49,6 +50,9 @@ class JournalOSApp:
         self.storage_mode = storage_mode or (mode if db_path is None else "durable")
         self.store = JournalStore(self.db_path)
         self.actions = ActionService(self.store)
+        # One shared SQLite connection: serverless runtimes may call handle()
+        # from several threads at once, so requests take turns.
+        self._lock = threading.Lock()
 
     def close(self) -> None:
         self.store.close()
@@ -66,7 +70,8 @@ class JournalOSApp:
         auth = (headers or {}).get("authorization") or (headers or {}).get("Authorization") or ""
         token = auth[7:].strip() if auth.lower().startswith("bearer ") else None
         try:
-            return self._route(method, path, query, data, token)
+            with self._lock:
+                return self._route(method, path, query, data, token)
         except AuthError as exc:
             return self._json(401, {"error": str(exc)})
         except Forbidden as exc:

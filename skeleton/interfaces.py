@@ -44,7 +44,8 @@ class AnimalScryptKernel:
     """Minimal, model-agnostic state & permission kernel for Animal Scrypt / Madken."""
 
     def __init__(self, db_path: str = ":memory:") -> None:
-        self.conn = sqlite3.connect(db_path)
+        # check_same_thread=False: threaded servers share this connection behind a lock.
+        self.conn = sqlite3.connect(db_path, check_same_thread=False)
         self.conn.row_factory = sqlite3.Row
         self.conn.executescript(SCHEMA_PATH.read_text(encoding="utf-8"))
 
