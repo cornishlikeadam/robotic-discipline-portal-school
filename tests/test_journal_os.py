@@ -240,6 +240,38 @@ class AuthorizationTests(Base):
             app.close()
 
 
+class SessionTokenTests(unittest.TestCase):
+    """Serverless hosts run several instances with separate storage. A token from
+    one must be accepted by another, which rebuilds the same workspace ids."""
+
+    def test_token_works_on_a_second_instance(self):
+        os.environ["JOURNAL_OS_SECRET"] = "test-secret"
+        try:
+            a, b = JournalStore(":memory:"), JournalStore(":memory:")
+            s = a.sign_in("kj")
+            user = b.user_for_token(s["token"])
+            self.assertEqual(user["id"], s["user"]["id"])
+            self.assertEqual(b.list_workspaces(user["id"])[0]["id"], s["workspaces"][0]["id"])
+            self.assertEqual(sorted(c["id"] for c in a.list_companions(user["id"], s["workspaces"][0]["id"])),
+                             sorted(c["id"] for c in b.list_companions(user["id"], s["workspaces"][0]["id"])))
+            a.close(); b.close()
+        finally:
+            del os.environ["JOURNAL_OS_SECRET"]
+
+    def test_tampered_or_expired_tokens_rejected(self):
+        from journal_os.store import AuthError
+        st = JournalStore(":memory:")
+        tok = st.sign_in("kj")["token"]
+        v, handle, exp, sig = tok.split(".")
+        for bad in (f"{v}.guest.{exp}.{sig}", f"{v}.{handle}.{int(exp) + 1}.{sig}", tok[:-2] + "00", "nonsense"):
+            with self.assertRaises(AuthError):
+                st.user_for_token(bad)
+        body = f"v1.kj.{int(time.time()) - 5}"
+        with self.assertRaises(AuthError):
+            st.user_for_token(f"{body}.{st._sign(body)}")
+        st.close()
+
+
 class SandboxTests(Base):
     def test_companion_session_runs_without_touching_personal_data(self):
         comp = self.store.list_companions(self.uid, self.ws)[0]

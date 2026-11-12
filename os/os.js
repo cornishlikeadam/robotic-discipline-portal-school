@@ -44,7 +44,15 @@ const minutesBetween = (a, b) => Math.round((parseIso(b) - parseIso(a)) / 60000)
 const HOUR_START = 6, HOUR_END = 24;
 
 /* ---------------------------------------------------------------- api */
-async function api(method, path, body) {
+// Requests run one at a time: serverless hosts start a new instance for every
+// concurrent request, and each instance has its own temporary storage.
+let apiQueue = Promise.resolve();
+function api(method, path, body) {
+  const run = apiQueue.then(() => apiNow(method, path, body));
+  apiQueue = run.catch(() => {});
+  return run;
+}
+async function apiNow(method, path, body) {
   const headers = { 'Content-Type': 'application/json' };
   if (S.token) headers.Authorization = `Bearer ${S.token}`;
   let res;

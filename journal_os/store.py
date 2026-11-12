@@ -9,10 +9,13 @@ from __future__ import annotations
 
 import datetime as dt
 import hashlib
+import hmac
 import json
+import os
 import pathlib
 import secrets
 import sqlite3
+import time
 import uuid
 from typing import Any, Dict, List, Optional
 
@@ -57,6 +60,10 @@ def utc_now() -> str:
 
 def _id(prefix: str) -> str:
     return f"{prefix}-{uuid.uuid4().hex[:10]}"
+
+
+def _stable(handle: str) -> str:
+    return hashlib.sha256(("journal-os-user:" + handle).encode("utf-8")).hexdigest()[:10]
 
 
 def _hash(token: str) -> str:
@@ -106,52 +113,98 @@ class JournalStore:
         )
 
     # ------------------------------------------------------- users/sessions
+    # Session tokens are signed (HMAC), not stored. Any server instance can
+    # verify one without a database lookup, so serverless hosts that run
+    # several copies with separate /tmp storage don't sign people out.
+    TOKEN_DAYS = 30
+
+    def _secret(self) -> bytes:
+        env = os.environ.get("JOURNAL_OS_SECRET")
+        if env:
+            return env.encode("utf-8")
+        if os.environ.get("VERCEL"):
+            # Shared across instances of one deployment. Sign-in has no password,
+            # so this is no weaker than the sign-in itself; set JOURNAL_OS_SECRET
+            # before adding real authentication.
+            return ("journal-os:" + os.environ.get("VERCEL_PROJECT_ID", "vercel")).encode("utf-8")
+        row = self._one("SELECT value FROM meta WHERE key = 'token_secret'")
+        if row:
+            return row["value"].encode("utf-8")
+        value = secrets.token_hex(32)
+        self.conn.execute("INSERT OR IGNORE INTO meta VALUES ('token_secret', ?)", (value,))
+        self.conn.commit()
+        return self._one("SELECT value FROM meta WHERE key = 'token_secret'")["value"].encode("utf-8")
+
+    def _sign(self, body: str) -> str:
+        return hmac.new(self._secret(), body.encode("utf-8"), hashlib.sha256).hexdigest()[:40]
+
+    def make_token(self, handle: str) -> str:
+        exp = int(time.time()) + self.TOKEN_DAYS * 86400
+        body = f"v1.{handle}.{exp}"
+        return f"{body}.{self._sign(body)}"
+
+    @staticmethod
+    def _clean_handle(handle: str) -> str:
+        handle = (handle or "").strip().lower()
+        if not handle or not handle.replace("-", "").replace("_", "").isalnum() or len(handle) > 32:
+            raise Invalid("Handle must be 1-32 letters, digits, '-' or '_'.")
+        return handle
+
+    def _ensure_user(self, handle: str, display_name: Optional[str] = None) -> Dict[str, Any]:
+        user = self._one("SELECT * FROM users WHERE handle = ?", (handle,))
+        if user:
+            return user
+        # Stable ids derived from the handle: a fresh server instance recreates
+        # the same user/workspace/companion ids the browser already holds.
+        user = {"id": "usr-" + _stable(handle), "handle": handle,
+                "display_name": (display_name or handle).strip()[:60], "created_at": utc_now()}
+        self.conn.execute("INSERT INTO users VALUES (:id, :handle, :display_name, :created_at)", user)
+        self._create_personal_workspace(user)
+        self.conn.commit()
+        return user
+
     def sign_in(self, handle: str, display_name: Optional[str] = None) -> Dict[str, Any]:
         """Local-profile sign-in (device trust model, no password).
 
         Creates the user + personal workspace + companions on first use.
-        Returns a session token; only its hash is stored.
         """
-        handle = (handle or "").strip().lower()
-        if not handle or not handle.replace("-", "").replace("_", "").isalnum() or len(handle) > 32:
-            raise Invalid("Handle must be 1-32 letters, digits, '-' or '_'.")
-        user = self._one("SELECT * FROM users WHERE handle = ?", (handle,))
-        if not user:
-            user = {"id": _id("usr"), "handle": handle, "display_name": (display_name or handle).strip()[:60],
-                    "created_at": utc_now()}
-            self.conn.execute("INSERT INTO users VALUES (:id, :handle, :display_name, :created_at)", user)
-            self._create_personal_workspace(user)
-        token = secrets.token_urlsafe(32)
-        expires = (dt.datetime.now(dt.timezone.utc) + dt.timedelta(days=30)).replace(microsecond=0).isoformat()
-        self.conn.execute("INSERT INTO sessions VALUES (?, ?, ?, ?)", (_hash(token), user["id"], utc_now(), expires))
+        handle = self._clean_handle(handle)
+        user = self._ensure_user(handle, display_name)
         self.audit(None, user["id"], "session.create", "user", user["id"])
         self.conn.commit()
-        return {"token": token, "user": user, "workspaces": self.list_workspaces(user["id"])}
+        return {"token": self.make_token(handle), "user": user, "workspaces": self.list_workspaces(user["id"])}
 
     def user_for_token(self, token: Optional[str]) -> Dict[str, Any]:
         if not token:
             raise AuthError("Sign in required.")
-        row = self._one(
-            "SELECT u.* , s.expires_at FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = ?",
-            (_hash(token),),
-        )
-        if not row or row["expires_at"] < utc_now():
+        parts = token.split(".")
+        if len(parts) != 4 or parts[0] != "v1":
             raise AuthError("Session expired or invalid.")
-        row.pop("expires_at", None)
-        return row
+        body = ".".join(parts[:3])
+        if not hmac.compare_digest(self._sign(body), parts[3]):
+            raise AuthError("Session expired or invalid.")
+        try:
+            exp = int(parts[2])
+            handle = self._clean_handle(parts[1])
+        except (ValueError, Invalid):
+            raise AuthError("Session expired or invalid.")
+        if exp < time.time():
+            raise AuthError("Session expired.")
+        return self._ensure_user(handle)
 
     def sign_out(self, token: str) -> None:
-        self.conn.execute("DELETE FROM sessions WHERE token_hash = ?", (_hash(token),))
-        self.conn.commit()
+        """Signed tokens are dropped by the browser; nothing is stored server-side."""
+        return None
 
     def _create_personal_workspace(self, user: Dict[str, Any]) -> str:
-        ws_id = _id("ws")
+        key = _stable(user["handle"])
+        ws_id = "ws-" + key
         now = utc_now()
         self.conn.execute("INSERT INTO workspaces VALUES (?, ?, 'personal', ?, ?)",
                           (ws_id, f"{user['display_name']}'s desk", user["id"], now))
         self.conn.execute("INSERT INTO workspace_memberships VALUES (?, ?, 'owner', ?)", (ws_id, user["id"], now))
         for name, lore in DEFAULT_COMPANIONS:
-            cid = f"cmp-{name.lower()}-{uuid.uuid4().hex[:6]}"
+            cid = f"cmp-{name.lower()}-{key[:6]}"
             # kernel commits internally
             self.kernel.register_companion(cid, user["id"], name, lore, ChassisSpec())
             self.conn.execute("INSERT INTO workspace_companions VALUES (?, ?)", (ws_id, cid))
