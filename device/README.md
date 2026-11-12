@@ -23,6 +23,6 @@ After editing `model.js` or `drawing.json`, rebuild the viewer:
 ```sh
 cd device && npm install
 node ../tools/teardown/scripts/proof.cjs drawing.json proof/ --quick
-node ../tools/teardown/scripts/build-viewer.cjs drawing.json ../os/device/teardown.html
+node build.cjs   # builds the viewer and inlines the pixel-world controls
 node ../tools/teardown/scripts/check-viewer.cjs ../os/device/teardown.html check/
 ```
