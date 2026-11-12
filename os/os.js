@@ -188,7 +188,7 @@ function route() {
   const harnessReady = typeof Harness !== 'undefined';
   if (id !== 'channels' && harnessReady) Harness.leave();
   const views = { planner: viewPlanner, journal: viewJournal, companion: viewCompanion, together: viewTogether,
-    channels: harnessReady ? () => Harness.view() : () => viewStatus(id) };
+    channels: harnessReady ? () => Harness.view() : () => viewStatus(id), device: viewDevice };
   const fn = views[id] || (() => viewStatus(id));
   if (typeof Barnacle !== 'undefined') Barnacle.onRoute(id);
   fn();
@@ -760,6 +760,22 @@ async function viewTogether() {
     const en = entries.find((x) => x.event_id === a.dataset.disc && x.origin === 'companion_sandbox');
     location.hash = en ? `#journal?e=${en.id}` : '#journal';
   }));
+}
+
+/* ---------------------------------------------------------------- companion device */
+// The teardown is a self-contained page (built by tools/teardown from device/model.js),
+// so it runs in a frame and keeps its own controls, worker and downloads.
+function viewDevice() {
+  $('#view').innerHTML = `<div class="view-head"><div><h1>Companion Device</h1>
+      <p>A working teardown of PATCH, the physical companion: switch between exploded and assembled, change the pose and battery under settings, pick a part to isolate it, recolor any part, and download SVG, PNG or PDF.</p></div>
+      <div class="toolbar"><span class="chip live-partial">Concept</span>
+        <a class="btn small" href="/os/device/teardown.html" target="_blank" rel="noopener">Open full screen</a></div></div>
+    <ul class="dv-specs" aria-label="Concept specifications">
+      <li><b>≈ 198 × 120 × 90 mm</b><span>size</span></li><li><b>ARM + NPU</b><span>on-device AI</span></li>
+      <li><b>3,000–4,000 mAh</b><span>4–8 h active</span></li><li><b>Mic array · camera · speaker</b><span>senses</span></li>
+      <li><b>Magnetic dock</b><span>pogo-pin charging</span></li></ul>
+    <div class="dv-frame"><iframe src="/os/device/teardown.html" title="PATCH companion teardown: interactive technical illustration" loading="lazy"></iframe></div>
+    <p class="muted dv-note">Concept drawing, not to scale. Proportions follow the PATCH renders; the internals are illustrative and no hardware runtime is connected yet.</p>`;
 }
 
 /* ---------------------------------------------------------------- planned / status */

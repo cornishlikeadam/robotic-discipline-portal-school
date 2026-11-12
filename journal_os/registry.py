@@ -36,7 +36,7 @@ APP_REGISTRY = [
      "blurb": "Suggested and autonomous-sandbox modes with scheduled background runs. Only Manual mode exists."},
     {"id": "collab", "name": "Shared Workspaces", "status": "planned", "route": "#collab", "theme": "steel",
      "blurb": "Backend memberships and role checks exist; invitations, consent flow and UI do not."},
-    {"id": "device", "name": "Companion Device", "status": "planned", "route": "#device", "theme": "steel",
-     "blurb": "Local hardware runtime. The server already runs offline on one machine; no device "
-              "integration or local model yet."},
+    {"id": "device", "name": "Companion Device", "status": "live-partial", "route": "#device", "theme": "steel",
+     "blurb": "Interactive concept teardown of the PATCH robot: exploded and assembled views, pose and "
+              "battery settings, part colors and SVG/PNG/PDF downloads. No hardware runtime yet."},
 ]
