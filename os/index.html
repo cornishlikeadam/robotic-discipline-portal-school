@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#16141c">
+  <title>Journal OS — Robotic Discipline</title>
+  <meta name="description" content="Journal OS: a local-first planner, living journal and companion memory ledger for Robotic Discipline.">
+  <link rel="stylesheet" href="os.css">
+  <script src="os.js" defer></script>
+</head>
+<body>
+  <a class="skip" href="#view">Skip to content</a>
+  <div id="net-banner" class="net-banner" role="alert" hidden></div>
+
+  <header class="topbar">
+    <a class="brand" href="#planner" aria-label="Journal OS home">
+      <span class="brand-mark" aria-hidden="true"></span>
+      <span class="brand-text"><b>ROBOTIC DISCIPLINE</b><span>JOURNAL OS · MVP</span></span>
+    </a>
+    <div class="topbar-right">
+      <span id="storage-badge" class="chip" hidden></span>
+      <span id="who" class="who"></span>
+      <button id="sign-out" class="btn ghost small" type="button" hidden>Sign out</button>
+    </div>
+  </header>
+
+  <section id="signin" class="signin" hidden>
+    <div class="signin-card">
+      <h1>Open your desk.</h1>
+      <p>Pick a local profile name. This prototype uses a device-trust sign-in (no password): anyone on this machine can open a profile. Each profile only sees its own workspace.</p>
+      <form id="signin-form">
+        <label for="handle">Profile name</label>
+        <input id="handle" name="handle" autocomplete="username" required maxlength="32" pattern="[A-Za-z0-9_\-]+" value="kj">
+        <button class="btn primary" type="submit">Open Journal OS</button>
+      </form>
+    </div>
+  </section>
+
+  <div id="app" hidden>
+    <section class="command" aria-labelledby="command-label">
+      <form id="command-form" class="command-form">
+        <label id="command-label" for="command-input"><span class="pixel-dot" aria-hidden="true"></span>Ask PATCH</label>
+        <input id="command-input" autocomplete="off" placeholder="Schedule a robotics build session tomorrow at 11 for 90 minutes">
+        <button class="btn primary" type="submit">Preview</button>
+      </form>
+      <div id="preview" class="preview" hidden aria-live="polite"></div>
+    </section>
+
+    <nav class="dock" aria-label="Applications" id="dock"></nav>
+
+    <main id="view" class="view" tabindex="-1"></main>
+  </div>
+
+  <dialog id="event-dialog" aria-labelledby="event-dialog-title">
+    <form id="event-form" method="dialog" class="dialog-form"></form>
+  </dialog>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+</body>
+</html>

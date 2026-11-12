@@ -2,6 +2,10 @@
   "version": 2,
   "rewrites": [
     {
+      "source": "/os",
+      "destination": "/os/index.html"
+    },
+    {
       "source": "/gamified",
       "destination": "/index.html"
     },

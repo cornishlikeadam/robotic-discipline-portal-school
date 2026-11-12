@@ -8,6 +8,10 @@
 
 ---
 
+## ★ Journal OS MVP (branch `journal-os-mvp`)
+
+A planner-first companion environment: natural-language request → preview → approval → saved event → linked journal entry → companion memory approval → still there after restart. Run `python3 -m journal_os.server` and open `http://127.0.0.1:8090/os/`. Architecture, schema, test results, the working-vs-planned table and the demo script are in [`JOURNAL_OS.md`](./JOURNAL_OS.md).
+
 ## Live Gamified Sites (GitHub Pages `github.io` + Vercel Backend)
 
 * **[★ GitHub Pages (`github.io`) Live Site](https://cornishlikeadam.github.io/robotic-discipline-portal-school/)** — `https://cornishlikeadam.github.io/robotic-discipline-portal-school/`
