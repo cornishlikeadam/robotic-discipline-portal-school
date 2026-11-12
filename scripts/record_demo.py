@@ -82,7 +82,7 @@ def main() -> None:
             page.goto(f"{base}/os/")
             page.fill("#handle", "kj")
             page.click("text=Open Journal OS")
-            expect(page.locator("#dock .card")).to_have_count(11)
+            expect(page.locator("#dock .card")).to_have_count(12)
             snap(page, "planner-empty")
 
             # 2. Manual event

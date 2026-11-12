@@ -7,7 +7,11 @@
   <title>Journal OS — Robotic Discipline</title>
   <meta name="description" content="Journal OS: a local-first planner, living journal and companion memory ledger for Robotic Discipline.">
   <link rel="stylesheet" href="os.css">
+  <link rel="stylesheet" href="harness.css">
+  <link rel="stylesheet" href="bubble.css">
   <script src="os.js" defer></script>
+  <script src="harness.js" defer></script>
+  <script src="bubble.js" defer></script>
 </head>
 <body>
   <a class="skip" href="#view">Skip to content</a>
@@ -54,6 +58,10 @@
 
   <dialog id="event-dialog" aria-labelledby="event-dialog-title">
     <form id="event-form" method="dialog" class="dialog-form"></form>
+  </dialog>
+
+  <dialog id="hx-dialog" aria-labelledby="hx-dialog-title">
+    <form id="hx-dialog-form" method="dialog" class="dialog-form"></form>
   </dialog>
 
   <div id="toast" class="toast" role="status" aria-live="polite"></div>

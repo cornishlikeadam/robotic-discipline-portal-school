@@ -1,0 +1,152 @@
+/* Journal OS — Barnacle, the floating companion. Builds on the tokens in os.css. */
+
+.barnacle {
+  --gold: #e8c547;
+  --gold-soft: rgba(232, 197, 71, .16);
+  --gold-line: rgba(232, 197, 71, .38);
+  --bn-bg: #17141d;
+  --bn-bg-2: #201c28;
+  --serif: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+  position: fixed; right: 20px; bottom: calc(20px + env(safe-area-inset-bottom, 0px)); z-index: 45;
+  display: flex; flex-direction: column; align-items: flex-end; gap: 12px; pointer-events: none;
+}
+.barnacle > * { pointer-events: auto; }
+body.has-barnacle .view { padding-bottom: 120px; }
+.barnacle :focus-visible { outline: 3px solid var(--gold); outline-offset: 2px; }
+
+/* ---------- bubble ---------- */
+/* The button is a still hit area; only the orb inside it floats. */
+.bn-bubble { position: relative; width: 62px; height: 62px; padding: 0; border: 0; border-radius: 50%; background: transparent; cursor: pointer; }
+.bn-orb {
+  position: absolute; inset: 0; border-radius: 50%; border: 2px solid #000; display: grid; place-items: center;
+  background: radial-gradient(circle at 34% 30%, #fff1b8 0, var(--gold) 42%, #c99b1f 100%); color: #1a1405;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, .45), 4px 4px 0 #000; animation: bn-float 4.2s ease-in-out infinite;
+}
+.bn-orb::after {
+  content: ""; position: absolute; inset: -6px; border-radius: 50%; border: 2px solid var(--gold);
+  opacity: 0; animation: bn-pulse 3.6s ease-out infinite; pointer-events: none;
+}
+.bn-bubble:hover .bn-orb { filter: brightness(1.06); }
+.bn-bubble[aria-expanded="true"] .bn-orb, .bn-bubble[aria-expanded="true"] .bn-orb::after { animation: none; }
+.bn-b { font: italic 700 30px/1 var(--serif); transform: translateY(-1px); }
+.bn-badge {
+  position: absolute; top: -6px; right: -6px; min-width: 24px; height: 24px; padding: 0 6px; border-radius: 12px;
+  background: var(--ink); color: var(--gold); border: 2px solid var(--gold); font: 700 12px/20px var(--mono); text-align: center;
+}
+.bn-bubble.has-news::before {
+  content: ""; position: absolute; left: -2px; top: 2px; width: 12px; height: 12px; border-radius: 50%;
+  background: var(--pink); border: 2px solid #000;
+}
+@keyframes bn-float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-5px); } }
+@keyframes bn-pulse { 0% { opacity: .55; transform: scale(.92); } 70%, 100% { opacity: 0; transform: scale(1.25); } }
+
+/* ---------- peek (speech bubble) ---------- */
+.bn-peek {
+  position: relative; max-width: 270px; padding: 12px 14px; border-radius: 14px; background: var(--bn-bg);
+  border: 1px solid var(--gold-line); box-shadow: 0 12px 30px rgba(0, 0, 0, .5); color: var(--text); font-size: 14px;
+  animation: bn-pop .22s ease-out;
+}
+.bn-peek::after {
+  content: ""; position: absolute; right: 24px; bottom: -7px; width: 12px; height: 12px; background: var(--bn-bg);
+  border-right: 1px solid var(--gold-line); border-bottom: 1px solid var(--gold-line); transform: rotate(45deg);
+}
+.bn-peek p { margin: 0 0 10px; }
+.bn-peek b { font-family: var(--serif); font-size: 16px; color: var(--gold); }
+@keyframes bn-pop { from { opacity: 0; transform: translateY(8px) scale(.97); } to { opacity: 1; transform: none; } }
+
+/* ---------- buttons ---------- */
+.bn-row { display: flex; gap: 8px; flex-wrap: wrap; }
+.bn-btn {
+  display: inline-flex; align-items: center; justify-content: center; min-height: 34px; padding: 6px 14px; border-radius: 999px;
+  border: 1px solid var(--gold); background: var(--gold); color: #1a1405; font: 650 14px var(--body); cursor: pointer; text-decoration: none;
+}
+.bn-btn:hover { filter: brightness(1.08); }
+.bn-btn.ghost { background: transparent; color: var(--gold); border-color: var(--gold-line); }
+.bn-btn.icon { width: 34px; padding: 0; font-size: 22px; line-height: 1; background: transparent; color: var(--text); border-color: var(--gold-line); }
+.bn-chip-btn {
+  text-align: left; padding: 7px 12px; border-radius: 12px; border: 1px solid var(--gold-line); background: var(--gold-soft);
+  color: var(--text); font: 14px/1.35 var(--body); cursor: pointer;
+}
+.bn-chip-btn:hover { border-color: var(--gold); }
+
+/* ---------- panel ---------- */
+.bn-panel {
+  width: 384px; height: min(600px, calc(100vh - 130px)); display: flex; flex-direction: column; overflow: hidden;
+  background: linear-gradient(180deg, var(--bn-bg-2), var(--bn-bg) 140px); color: var(--text);
+  border: 1px solid var(--gold-line); border-radius: 18px; box-shadow: 0 24px 60px rgba(0, 0, 0, .6), 0 0 0 1px #000;
+  transform-origin: bottom right; animation: bn-open .2s ease-out;
+}
+@keyframes bn-open { from { opacity: 0; transform: translateY(14px) scale(.96); } to { opacity: 1; transform: none; } }
+.bn-head { display: flex; align-items: center; gap: 10px; padding: 14px 14px 10px; border-bottom: 1px solid var(--gold-line); }
+.bn-mark {
+  width: 36px; height: 36px; flex: none; border-radius: 50%; display: grid; place-items: center; background: var(--gold);
+  color: #1a1405; font: italic 700 20px/1 var(--serif); border: 2px solid #000;
+}
+.bn-who { flex: 1; min-width: 0; }
+.bn-who h2 { margin: 0; font: 600 22px/1.1 var(--serif); letter-spacing: .01em; color: var(--paper); }
+.bn-who h2:focus { outline: none; }
+.bn-who p { margin: 2px 0 0; font-size: 13px; color: var(--text-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bn-tools { display: flex; gap: 6px; align-items: center; }
+.bn-tools .bn-btn { min-height: 32px; padding: 4px 10px; font-size: 13px; }
+.bn-agent { display: flex; align-items: center; gap: 8px; margin: 0; padding: 8px 14px 0; text-transform: none; letter-spacing: 0; font: 13px var(--body); color: var(--text-dim); }
+.bn-agent select { width: auto; flex: 1; min-height: 34px; padding: 4px 8px; border-radius: 10px; border: 1px solid var(--gold-line); background: var(--bn-bg); }
+
+.bn-msgs { list-style: none; margin: 0; padding: 14px; flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 14px; }
+.bn-panel .hx-msg { grid-template-columns: 28px minmax(0, 1fr); gap: 8px; }
+.bn-panel .hx-av .pix, .bn-panel .hx-initial { width: 28px; height: 28px; }
+.bn-panel .hx-initial { font-size: 15px; border-radius: 50%; background: var(--gold); }
+.bn-panel .hx-av .pix { border-radius: 6px; }
+.bn-panel .hx-text { font-size: 15px; line-height: 1.5; }
+.bn-panel .apv { padding: 10px 12px; gap: 6px; max-width: 100%; border-radius: 10px; box-shadow: 3px 3px 0 #000; }
+.bn-panel .apv .summary { font-size: 15px; }
+.bn-panel .apv dl { font-size: 13px; }
+.bn-panel .apv .btn { min-height: 36px; border-radius: 999px; }
+.bn-panel .apv .btn.primary { background: var(--gold); }
+.apv.bn-new { animation: bn-glow 1.6s ease-out 2; }
+@keyframes bn-glow { 0% { box-shadow: 3px 3px 0 #000, 0 0 0 0 rgba(232, 197, 71, .7); } 100% { box-shadow: 3px 3px 0 #000, 0 0 0 14px rgba(232, 197, 71, 0); } }
+
+.bn-intro { margin-top: auto; padding: 14px; border-radius: 14px; background: var(--gold-soft); border: 1px solid var(--gold-line); display: grid; gap: 10px; }
+.bn-intro h3 { margin: 0; font: 600 20px/1.2 var(--serif); color: var(--gold); }
+.bn-intro p { margin: 0; font-size: 14px; color: var(--text); }
+.bn-sugg { display: grid; gap: 6px; }
+.bn-intro .bn-btn { justify-self: start; }
+
+/* ---------- context + composer ---------- */
+.bn-ctx { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; padding: 8px 14px 0; }
+.bn-ctx-label { width: 100%; font: 600 11px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--text-dim); }
+.bn-chip {
+  display: inline-flex; align-items: center; gap: 6px; max-width: 100%; padding: 3px 4px 3px 10px; border-radius: 999px;
+  background: var(--gold-soft); border: 1px solid var(--gold-line); font-size: 13px; overflow-wrap: anywhere;
+}
+.bn-chip button {
+  flex: none; width: 24px; height: 24px; border-radius: 50%; border: 0; background: transparent; color: var(--gold);
+  font-size: 16px; line-height: 1; cursor: pointer;
+}
+.bn-chip button:hover { background: var(--gold-soft); }
+.bn-compose { display: flex; gap: 8px; align-items: flex-end; padding: 10px 14px 14px; }
+.bn-compose textarea {
+  flex: 1; min-height: 44px; max-height: 140px; resize: none; border-radius: 14px; border: 1px solid var(--gold-line);
+  background: var(--ink); line-height: 1.4; font-size: 15px;
+}
+.bn-compose textarea:focus { border-color: var(--gold); }
+.bn-send {
+  min-height: 44px; padding: 0 16px; border-radius: 14px; border: 1px solid #000; background: var(--gold); color: #1a1405;
+  font: 700 15px var(--body); cursor: pointer; box-shadow: 2px 2px 0 #000;
+}
+.bn-send[disabled] { opacity: .5; cursor: progress; }
+
+/* ---------- phone: bubble stays put, the panel becomes a bottom sheet ---------- */
+@media (max-width: 640px) {
+  .barnacle { right: 16px; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); }
+  .bn-bubble { width: 58px; height: 58px; }
+  body.bn-open .barnacle { left: 0; right: 0; bottom: 0; }
+  body.bn-open .bn-bubble { display: none; }
+  .bn-panel {
+    width: 100%; height: min(82dvh, 680px); border-radius: 20px 20px 0 0; border-bottom: 0;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  .bn-tools #bn-full { display: none; }
+  .bn-btn, .bn-chip button { min-height: 40px; }
+  .bn-chip button { width: 32px; height: 32px; }
+  .bn-peek { max-width: calc(100vw - 32px); }
+}

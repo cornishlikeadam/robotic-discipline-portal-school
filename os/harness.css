@@ -1,0 +1,158 @@
+/* Journal OS — Channels (agent harness). Builds on the tokens in os.css. */
+
+.hx { display: grid; grid-template-columns: 250px minmax(0, 1fr); gap: 14px; height: max(560px, calc(100vh - 340px)); }
+.hx.has-thread { grid-template-columns: 250px minmax(0, 1fr) minmax(300px, 380px); }
+.hx-side, .hx-main, .hx-thread {
+  background: var(--ink-2); border: 2px solid #000; box-shadow: var(--hard);
+  min-height: 0; min-width: 0; display: flex; flex-direction: column;
+}
+
+/* ---------- sidebar ---------- */
+.hx-side { padding: 12px 10px; gap: 6px; overflow-y: auto; }
+.hx-side-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin: 4px 2px 2px; }
+.hx-side-head h2 { font: 700 18px/1 var(--display); letter-spacing: .05em; text-transform: uppercase; margin: 0; }
+.hx-side-head + .hx-list { margin-bottom: 12px; }
+.hx-side-note { margin: auto 2px 0; font-size: 12px; }
+.hx-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+.hx-ch {
+  display: flex; align-items: center; gap: 8px; min-height: 36px; padding: 4px 8px; border: 2px solid transparent;
+  border-radius: 3px; color: var(--text); text-decoration: none; font-weight: 600;
+}
+.hx-ch:hover { background: var(--ink-3); }
+.hx-ch[aria-current="page"] { background: var(--lime); color: #000; border-color: #000; box-shadow: 2px 2px 0 #000; }
+.hx-ch .sig { font: 700 15px var(--mono); width: 14px; text-align: center; opacity: .75; }
+.hx-ch .nm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hx-ch small { font: 600 10px var(--mono); letter-spacing: .08em; text-transform: uppercase; opacity: .7; }
+.hx-count { background: var(--amber); color: #000; border: 2px solid #000; font: 700 11px/1 var(--mono); padding: 3px 5px; border-radius: 2px; }
+.hx-unread { width: 9px; height: 9px; flex: none; background: var(--pink); box-shadow: 0 0 0 2px #000; }
+.hx-agent {
+  display: flex; align-items: center; gap: 8px; width: 100%; min-height: 44px; padding: 4px 6px; background: transparent;
+  border: 2px solid transparent; border-radius: 3px; color: var(--text); text-align: left; cursor: pointer;
+}
+.hx-agent:hover { background: var(--ink-3); }
+.hx-agent b { display: block; line-height: 1.2; }
+.hx-agent small, .hx-members small { font: 11px var(--mono); color: var(--text-dim); }
+
+.hx .pix, .hx-members .pix, .hx-mentions .pix {
+  width: 32px; height: 32px; flex: none; image-rendering: pixelated; background: var(--ink); border: 2px solid #000; padding: 2px;
+}
+.hx-initial {
+  width: 32px; height: 32px; flex: none; display: grid; place-items: center; background: var(--paper); color: #000;
+  border: 2px solid #000; font: 700 18px/1 var(--display);
+}
+
+/* ---------- channel header ---------- */
+.hx-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 10px 14px; border-bottom: 2px solid #000; background: var(--ink-3); }
+.hx-title { min-width: 0; }
+.hx-head h2 { font: 700 26px/1 var(--display); letter-spacing: .02em; text-transform: uppercase; margin: 0; overflow-wrap: anywhere; }
+.hx-head p { margin: 4px 0 0; }
+.hx-head .chip { font-size: 9px; padding: 2px 5px; vertical-align: 1px; }
+.hx-faces {
+  display: flex; align-items: center; flex: none; padding: 4px 10px 4px 16px; background: var(--ink); color: var(--text);
+  border: 2px solid #000; box-shadow: 2px 2px 0 #000; cursor: pointer; min-height: 40px;
+}
+.hx-faces .pix, .hx-faces .hx-initial { width: 28px; height: 28px; margin-left: -8px; }
+.hx-faces-n { font: 700 13px var(--mono); margin-left: 8px; }
+.hx-banner {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; padding: 6px 14px;
+  background: var(--amber); color: #000; border-bottom: 2px solid #000; font-weight: 700; font-size: 14px;
+}
+.hx-banner .btn { background: var(--paper); color: #000; }
+
+/* ---------- messages ---------- */
+.hx-msgs { list-style: none; margin: 0; padding: 14px; display: flex; flex-direction: column; gap: 16px; flex: 1; min-height: 0; overflow-y: auto; }
+.hx-msg { display: grid; grid-template-columns: 36px minmax(0, 1fr); gap: 10px; }
+.hx-meta { display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap; }
+.hx-meta .chip { font-size: 9px; padding: 2px 5px; align-self: center; }
+.hx-meta time { font: 12px var(--mono); color: var(--text-dim); }
+.chip.agent { background: var(--cyan); color: #000; }
+.chip.stub { background: transparent; color: var(--text-dim); border: 1px dashed var(--steel); }
+.hx-text { margin: 2px 0 0; overflow-wrap: anywhere; }
+.hx-ctx { margin: 4px 0 0; font: 12px var(--mono); color: var(--text-dim); overflow-wrap: anywhere; }
+.mention { color: var(--cyan); background: rgba(92, 225, 230, .14); padding: 0 3px; border-radius: 2px; font-weight: 700; }
+.hx-msg-foot { display: flex; gap: 14px; align-items: center; margin-top: 4px; min-height: 24px; }
+.hx-replies, .hx-reply { background: none; border: 0; padding: 2px 0; cursor: pointer; font: 600 13px var(--mono); }
+.hx-replies { color: var(--lime); }
+.hx-reply { color: var(--text-dim); }
+.hx-replies:hover, .hx-reply:hover { text-decoration: underline; }
+@media (hover: hover) {
+  .hx-msg .hx-reply { opacity: 0; }
+  .hx-msg:hover .hx-reply, .hx-msg:focus-within .hx-reply { opacity: 1; }
+}
+.hx-start { margin-top: auto; }
+
+/* ---------- approval cards ---------- */
+.apv {
+  margin-top: 8px; max-width: 580px; display: grid; gap: 8px; padding: 12px 14px;
+  background: var(--paper); color: #111; border: 2px solid #000; box-shadow: var(--hard);
+}
+.apv:focus { outline: 3px solid var(--lime); outline-offset: 4px; }
+.apv.pending { outline: 3px dashed var(--amber); outline-offset: 4px; }
+.apv.pending:focus { outline-style: solid; }
+.apv .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.apv .tag { font: 700 11px/1.2 var(--mono); letter-spacing: .1em; text-transform: uppercase; padding: 4px 7px; background: #111; color: var(--lime); }
+.apv .tag.wait { background: var(--amber); color: #000; box-shadow: 0 0 0 2px #000; }
+.apv .tag.ok { background: var(--moss); color: #000; box-shadow: 0 0 0 2px #000; }
+.apv .tag.no { background: #d8d0bf; color: #222; }
+.apv .tag.err { background: var(--danger); color: #000; box-shadow: 0 0 0 2px #000; }
+.apv .summary { margin: 0; font-size: 16px; font-weight: 650; }
+.apv dl { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 3px 14px; margin: 0; font-size: 14px; }
+.apv dt { font: 600 11px/1.9 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: #5a5462; }
+.apv dd { margin: 0; overflow-wrap: anywhere; white-space: pre-line; }
+.apv .note { margin: 0; font-size: 14px; color: #4a4552; }
+.apv a.btn { text-decoration: none; }
+.apv.approved { background: #e9ffd0; }
+.apv.rejected { background: var(--paper-2); }
+.apv.rejected .summary, .apv.rejected dl { opacity: .7; }
+.apv.failed { background: #ffe1dc; }
+
+/* ---------- composer ---------- */
+.hx-compose { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: end; padding: 10px; border-top: 2px solid #000; background: var(--ink-3); }
+.hx-input-wrap { position: relative; }
+.hx-compose textarea { min-height: 44px; max-height: 180px; resize: none; line-height: 1.45; }
+.hx-hint { grid-column: 1 / -1; margin: -2px 2px 0; font: 11px var(--mono); color: var(--text-dim); }
+.hx-thread .hx-hint { display: none; }
+.hx-note { margin: 0; padding: 12px 14px; border-top: 2px solid #000; background: var(--ink-3); color: var(--text-dim); font-size: 14px; }
+.hx-mentions {
+  position: absolute; left: 0; bottom: calc(100% + 6px); z-index: 6; min-width: 240px; list-style: none; margin: 0; padding: 4px;
+  background: var(--paper); color: #111; border: 2px solid #000; box-shadow: var(--hard);
+}
+.hx-mentions li { display: flex; align-items: center; gap: 8px; padding: 5px 8px; cursor: pointer; border-radius: 2px; }
+.hx-mentions li[aria-selected="true"] { background: var(--lime); }
+.hx-mentions small { font: 12px var(--mono); color: #555; }
+
+/* ---------- thread ---------- */
+.hx-thread-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 10px 12px; border-bottom: 2px solid #000; background: var(--ink-3); }
+.hx-thread-head h2 { font: 700 22px/1 var(--display); text-transform: uppercase; margin: 0; }
+
+/* ---------- live indicator ---------- */
+.live-dot { display: inline-flex; align-items: center; gap: 8px; font: 600 12px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--text-dim); }
+.live-dot::before { content: ""; width: 10px; height: 10px; background: var(--steel); box-shadow: 0 0 0 2px #000; }
+.live-dot.on { color: var(--text); }
+.live-dot.on::before { background: var(--lime); animation: blink 1.6s steps(2) infinite; }
+.live-dot.retry::before { background: var(--danger); }
+
+/* ---------- empty state + dialogs ---------- */
+.hx-empty { margin: auto; max-width: 480px; }
+.hx-empty h2 { margin-top: 0; }
+.hx-members { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; max-height: 260px; overflow-y: auto; }
+.hx-members li { display: flex; align-items: center; gap: 10px; }
+dialog .hx-members small, dialog .hx-pick small { color: #555; }
+.hx-instr { margin: 0; white-space: pre-line; font-size: 14px; background: #fff; border: 2px solid #000; padding: 8px; }
+.hx-pick { border: 2px solid #000; border-radius: 4px; padding: 8px 12px 10px; margin: 0; display: grid; gap: 6px; }
+.hx-pick legend { font: 600 12px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: #444; padding: 0 4px; }
+.dialog-form small.muted { display: block; margin-top: 4px; color: #555; font-size: 12px; }
+
+@media (max-width: 980px) {
+  .hx, .hx.has-thread { grid-template-columns: minmax(0, 1fr); height: auto; }
+  .hx-side { max-height: 260px; }
+  .hx-main { height: max(480px, 72vh); }
+  .hx-thread { position: fixed; inset: 0; z-index: 60; border: 0; box-shadow: none; } /* above Barnacle */
+}
+@media (max-width: 640px) {
+  .hx-hint { display: none; }
+  .hx-head { flex-wrap: wrap; }
+  .hx-head h2 { font-size: 22px; }
+  .hx-msgs { padding: 10px; }
+  .apv dl { grid-template-columns: minmax(0, 1fr); gap: 0; }
+}

@@ -27,7 +27,7 @@ Python 3.10+ standard library only. No pip install is needed to run it.
 python3 -m unittest discover -s tests -v
 ```
 
-Result on 2026-11-12: **73 tests, all passing** (24 in `tests/test_journal_os.py`, 28 in `tests/test_agent_harness.py`, 21 for the older modules).
+Result on 2026-11-12: **103 tests, all passing** (24 in `tests/test_journal_os.py`, 28 in `tests/test_agent_harness.py`, 19 in `tests/test_harness_routes.py`, 11 in `tests/test_barnacle_context.py`, 21 for the older modules).
 
 | Area | Tests |
 |---|---|
@@ -44,7 +44,7 @@ Result on 2026-11-12: **73 tests, all passing** (24 in `tests/test_journal_os.py
 | Agent harness: messages | @mentions resolve only to agents in the channel; threads stay one level deep; listing and limits; agents must be active posting members; reply chains stop after 4 hops |
 | Agent harness: approvals | a tool call saves nothing until approved; approve runs it, reject doesn't; mixed outcomes; agent proposals can't be approved from the command bar; 6 kinds of bad tool call write nothing; memory tools need a ledger and still need ledger approval; only the owner decides; edits can't retarget; failures are recorded; `post_message` posts only after approval; other workspaces and private channels stay closed; a pending approval survives a restart |
 
-**Browser end-to-end and recording:** `scripts/record_demo.py` drives the real UI in headless Chromium, restarts the server partway through, and saves `journey.webm` and screenshots. On 2026-11-11 it passed 11/11 checks with no page errors. It needs `pip install playwright && python -m playwright install chromium`.
+**Browser end-to-end and recording:** `scripts/record_demo.py` drives the real UI in headless Chromium, restarts the server partway through, and saves `journey.webm` and screenshots. On 2026-11-12 it passed 11/11 checks with no page errors. `scripts/harness_demo.py` does the same for Channels with two tabs (14/14 checks; see [HARNESS.md](HARNESS.md)), and `scripts/barnacle_demo.py` for the Barnacle companion (12/12 checks). Both need `pip install playwright && python -m playwright install chromium`.
 
 ```bash
 python3 scripts/record_demo.py --out demo-output
@@ -59,11 +59,14 @@ os/                     Journal OS front end (vanilla JS, no build step)
   index.html            shell: top bar, command bar + preview, app dock, view
   os.css                Robotic Discipline theme (pixel cards, zine panels)
   os.js                 planner (day/week/month, drag to move), journal, companion, together
+  harness.js, harness.css  Channels: channels, DMs, threads, approval cards, live stream
+  bubble.js, bubble.css    Barnacle: the floating companion on every view
 journal_os/
   schema.sql            Journal OS tables (separate from the kernel's tables)
   store.py              data layer; every method checks workspace role first (now also channels, agents, messages, approvals)
   interpreter.py        deterministic NL → whitelisted action; LLM adapter interface
   actions.py            proposal → approve/reject → execute; agent tool-call decisions; sandbox simulation
+  harness.py            agent reply path: the rule-based stand-in and the AgentRuntime interface
   registry.py           shared app registry with honest status labels
   server.py             HTTP routes (/api/os/*) + local server
 skeleton/interfaces.py  existing Animal Scrypt kernel (companions, memory ledger), reused as-is
@@ -98,7 +101,7 @@ api/index.py            existing Vercel gateway; now forwards /api/os/* to Journ
 | `approvals` | one row per agent tool call: `tool_name`, `tool_input_json`, status `pending` → `approved` / `rejected` / `failed`, `decided_by`, result, and `proposal_id` linking planner/journal/memory tools to `action_proposals` |
 
 **API** (Bearer token from `POST /api/os/session`)
-`GET/POST /api/os/w/{ws}/events` · `GET/POST/DELETE /api/os/events/{id}` · `POST /api/os/events/{id}/run-sandbox` · `GET/POST /api/os/w/{ws}/journal` · `POST/DELETE /api/os/journal/{id}` · `GET /api/os/w/{ws}/companions[/{cid}/export]` · `GET/POST /api/os/w/{ws}/memories` · `POST /api/os/memories/{id}/review|forget` · `POST /api/os/w/{ws}/commands` · `GET /api/os/w/{ws}/actions` · `POST /api/os/actions/{id}/approve|reject` · `GET /api/os/w/{ws}/audit|grants|export` · `POST /api/os/w/{ws}/import|members` · `GET /api/os/health|registry|me`
+`GET/POST /api/os/w/{ws}/events` · `GET/POST/DELETE /api/os/events/{id}` · `POST /api/os/events/{id}/run-sandbox` · `GET/POST /api/os/w/{ws}/journal` · `POST/DELETE /api/os/journal/{id}` · `GET /api/os/w/{ws}/companions[/{cid}/export]` · `GET/POST /api/os/w/{ws}/memories` · `POST /api/os/memories/{id}/review|forget` · `POST /api/os/w/{ws}/commands` · `GET /api/os/w/{ws}/actions` · `POST /api/os/actions/{id}/approve|reject` · `GET /api/os/w/{ws}/audit|grants|export` · `POST /api/os/w/{ws}/import|members` · `GET /api/os/health|registry|me` · Channels, agents, approvals and the live stream: see [HARNESS.md](HARNESS.md#endpoints)
 
 **Path to a personal device.** The server is a single Python process on the standard library, using one SQLite file. It doesn't need a network and runs unchanged on a Raspberry Pi-class machine. The `LanguageModelAdapter` interface in `interpreter.py` is where a local model would plug in, and its output would still go through `validate_action` and user approval.
 
@@ -162,13 +165,27 @@ The goal is a Slack-style space inside the journal, where you, your companions a
 | Messages | `post_message` (people), `post_agent_message` (agents; tool calls become approvals), `get_message`, `list_messages` (top level or one thread) |
 | Approvals | `get_approval`, `list_approvals`, `require_approver`, `finish_approval` (internal); deciding is `ActionService.decide_tool_call` |
 
-**Left for the next prompts**
-- **Prompt 2: runtime.**
-  - A driver per model provider; a provider that isn't configured reports itself unavailable.
-  - An `agent_runs` queue with one run per agent per trigger message.
-  - A usage ledger that enforces `monthly_budget_usd`.
-  - HTTP routes for everything above.
-- **Prompt 3: Slack-style UI.** A channel sidebar, threads, approval cards and an agent directory.
+**Built since:** Prompt 2 added the Channels view, its HTTP routes, a live stream and a rule-based stand-in agent. See [HARNESS.md](HARNESS.md).
+
+**Still to build: a real model runtime**
+- A driver per model provider; a provider that isn't configured reports itself unavailable.
+- An `agent_runs` queue with one run per agent per trigger message, so slow replies happen in the background.
+- A usage ledger that enforces `monthly_budget_usd`.
+
+---
+
+## Barnacle, the floating companion
+
+Barnacle is a gold bubble in the bottom-right corner of every Journal OS view (planner, journal, companion, Together, Channels). It stays put while you scroll and opens a compact chat panel; on a phone the panel is a bottom sheet. It talks through one agent: Chief of Staff if you have one (handle `chief-of-staff`, or "chief of staff" in its name or job), otherwise PATCH. If you have more than one agent, you can switch between them in the panel.
+
+- **Same system, same gate.** The conversation is a DM in [Channels](HARNESS.md), so messages land in the `messages` table and every change the agent asks for is a normal approval card. Nothing in the journal, planner or memory ledger changes until you press Approve. The same conversation is visible under Channels → DMs.
+- **Light context.** With each message Barnacle sends what you're looking at: the open journal entry, the event you last opened in the planner, and any text you've selected. The panel shows this as chips you can remove before sending. The server re-reads titles from the database and refuses anything outside your workspace, and the message records what was shared.
+- **What the stand-in does with it.**
+  - "Remember this" proposes the selected text as a memory, linked to the entry or event.
+  - "Move this to Friday at 3pm", "Cancel this" and "Create a journal entry for this" target the open event.
+  - Anything else gets suggestions based on what you're viewing.
+- **Presence.** The bubble floats and pulses gently, and its badge shows how many approvals are waiting. When you select a sentence in the journal it offers "Want me to keep…?". On first visit it introduces itself; **Show me** (or **Demo** in the panel) types a sample request and sends it, producing a real approval card to approve or reject. If the workspace has no agent yet, the demo sets up PATCH first.
+- **Motion** is turned off for people who ask their system for reduced motion.
 
 ---
 
@@ -194,8 +211,11 @@ The goal is a Slack-style space inside the journal, where you, your companions a
 | Shared workspaces UI, invitations, mutual consent | **Planned** (backend memberships and roles exist; there is no UI) |
 | Cross-account companion play | **Disabled** until identity verification ships |
 | World module, device integration | **Planned** |
-| Agent harness data layer: channels, members, agents, messages, approvals | **Working** (store + tests; no HTTP routes or UI yet) |
-| Agent runtime (models answering @mentions) and the channel UI | **Planned**: Prompts 2 and 3 |
+| Agent harness data layer: channels, members, agents, messages, approvals | **Working** (store + tests) |
+| Channels view: channels, DMs, threads, @mentions, approval cards, live updates | **Working** ([HARNESS.md](HARNESS.md)); live updates are 3-second polling on Vercel |
+| Agents answering in channels | **Stand-in**: rule-based replies using the command bar's interpreter; no model is connected |
+| Barnacle floating companion (every view, context chips, approval cards in the panel) | **Working**; replies come from the stand-in |
+| Model runtime (drivers, background runs, budgets) | **Planned** |
 | Agent budgets | **Stored only**: `monthly_budget_usd` is saved but nothing spends or enforces it until the runtime exists |
 
 ## Known limitations
@@ -206,7 +226,7 @@ The goal is a Slack-style space inside the journal, where you, your companions a
 4. **The interpreter is rule-based.** It handles the phrasings in the tests and close variants, and refuses anything else (it shows examples rather than guessing). "At 3" with no AM/PM is read as 3 PM; times from 7 to 11 are read as AM.
 5. **Journal entries are plain text** with tags. There are no images or rich formatting yet.
 6. **Recurring events** support only daily and weekly repeats, and edits apply to the whole series (no exceptions for single dates).
-7. **Concurrency:** one process with one SQLite connection, which is fine for one person.
+7. **Concurrency:** the local server handles requests on separate threads (so a live stream can stay open), but they take turns on one SQLite connection. That is fine for one person or a small group.
 
 ---
 

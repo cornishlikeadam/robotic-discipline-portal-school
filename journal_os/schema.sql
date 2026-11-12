@@ -190,6 +190,7 @@ CREATE TABLE IF NOT EXISTS messages (
     content TEXT NOT NULL DEFAULT '',
     mentions_json TEXT NOT NULL DEFAULT '[]',    -- ids of @mentioned agents (who should answer)
     tool_calls_json TEXT NOT NULL DEFAULT '[]',  -- [{tool, input, approval_id}]
+    context_json TEXT NOT NULL DEFAULT '{}',     -- what the person was looking at (entry/event title, selection)
     approval_status TEXT NOT NULL DEFAULT 'none'
         CHECK (approval_status IN ('none', 'pending', 'approved', 'rejected', 'mixed')),
     hop INTEGER NOT NULL DEFAULT 0,              -- agent-to-agent reply depth; capped to stop loops
