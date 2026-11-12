@@ -46,12 +46,7 @@ class ActionService:
             "status": "PENDING",
             "created_at": utc_now(),
         }
-        self.store.conn.execute(
-            "INSERT INTO action_proposals (id, workspace_id, user_id, source, input_text, action, payload_json,"
-            " summary, status, created_at) VALUES (:id, :workspace_id, :user_id, :source, :input_text, :action,"
-            " :payload_json, :summary, :status, :created_at)",
-            proposal,
-        )
+        self.store._insert_proposal(proposal)
         self.store.audit(workspace_id, user_id, "action.propose", "action", proposal["id"],
                          {"action": result["action"]})
         self.store.conn.commit()
@@ -78,18 +73,29 @@ class ActionService:
                               " rowid DESC LIMIT ?", (workspace_id, int(limit)))
         return [self.get(user_id, r["id"]) for r in ids]
 
-    def reject(self, user_id: str, proposal_id: str) -> Dict[str, Any]:
+    @staticmethod
+    def _guard_agent_proposal(prop: Dict[str, Any], via_harness: bool) -> None:
+        # An agent's proposal is mirrored by a row in `approvals`. Deciding it
+        # anywhere else would leave that card out of date, so only
+        # decide_tool_call may approve or reject it.
+        if prop["source"].startswith("agent:") and not via_harness:
+            raise Forbidden("This request came from an agent. Decide it from its approval card.")
+
+    def reject(self, user_id: str, proposal_id: str, *, via_harness: bool = False) -> Dict[str, Any]:
         prop = self.get(user_id, proposal_id)
         self.store.require_role(user_id, prop["workspace_id"], "editor")
+        self._guard_agent_proposal(prop, via_harness)
         if prop["status"] != "PENDING":
             raise Invalid(f"Proposal is already {prop['status']}.")
         self._finish(prop, "REJECTED", None)
         return self.get(user_id, proposal_id)
 
-    def approve(self, user_id: str, proposal_id: str, edited_payload: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    def approve(self, user_id: str, proposal_id: str, edited_payload: Optional[Dict[str, Any]] = None,
+                *, via_harness: bool = False) -> Dict[str, Any]:
         prop = self.get(user_id, proposal_id)
         ws = prop["workspace_id"]
         self.store.require_role(user_id, ws, "editor")
+        self._guard_agent_proposal(prop, via_harness)
         if prop["status"] != "PENDING":
             raise Invalid(f"Proposal is already {prop['status']}.")
         payload = dict(prop["payload"])
@@ -102,7 +108,8 @@ class ActionService:
             payload.update(edited_payload)
         try:
             interpreter.validate_action(prop["action"], payload)
-            result = self._execute(user_id, ws, prop["action"], payload)
+            via = "agent" if prop["source"].startswith("agent:") else "command"
+            result = self._execute(user_id, ws, prop["action"], payload, via)
         except (Invalid, ValueError, NotFound, Forbidden) as exc:
             self._finish(prop, "FAILED", {"error": str(exc)}, payload)
             raise
@@ -120,23 +127,24 @@ class ActionService:
                          {"action": prop["action"]})
         self.store.conn.commit()
 
-    def _execute(self, user_id: str, ws: str, action: str, p: Dict[str, Any]) -> Dict[str, Any]:
+    def _execute(self, user_id: str, ws: str, action: str, p: Dict[str, Any],
+                 via: str = "command") -> Dict[str, Any]:
         s = self.store
         if action == "create_event":
-            return {"event": s.create_event(user_id, ws, {**p, "calendar": "personal"}, via="command")}
+            return {"event": s.create_event(user_id, ws, {**p, "calendar": "personal"}, via=via)}
         if action == "update_event":
             fields = {k: v for k, v in p.items() if k != "event_id"}
             ev = s.get_event(user_id, p["event_id"])
             if ev["workspace_id"] != ws:
                 raise Forbidden("Event belongs to another workspace.")
-            return {"event": s.update_event(user_id, p["event_id"], fields, via="command")}
+            return {"event": s.update_event(user_id, p["event_id"], fields, via=via)}
         if action == "delete_event":
             ev = s.get_event(user_id, p["event_id"])
             if ev["workspace_id"] != ws:
                 raise Forbidden("Event belongs to another workspace.")
-            return s.delete_event(user_id, p["event_id"], via="command")
+            return s.delete_event(user_id, p["event_id"], via=via)
         if action == "create_journal_entry":
-            return {"entry": s.create_entry(user_id, ws, p, via="command")}
+            return {"entry": s.create_entry(user_id, ws, p, via=via)}
         if action == "propose_memory":
             companion_id = p.get("companion_id") or self._default_companion(user_id, ws)
             mem = s.propose_memory(user_id, ws, companion_id, p.get("category") or "observation", p.get("content", ""),
@@ -151,9 +159,61 @@ class ActionService:
                 if not s.companion_may(ws, companions[n]["id"], "companion_calendar", "propose"):
                     raise Forbidden(f"{n} is not permitted on the companion calendar.")
             ev = s.create_event(user_id, ws, {**p, "calendar": "companion", "kind": "event",
-                                              "participants": parts}, via="command")
+                                              "participants": parts}, via=via)
             return {"event": ev}
         raise Invalid(f"Unknown action {action}")
+
+    # -------------------------------------------------- agent tool calls
+    def decide_tool_call(self, user_id: str, approval_id: str, approve: bool,
+                         edited_input: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        """Approve or reject one tool call an agent asked for.
+
+        Planner, journal and memory tools run through `approve` above (the same
+        whitelist, edit locks and executor as typed requests). post_message
+        posts the agent's text into the other channel. Either way the
+        `approvals` row and its message's approval_status are updated after.
+        """
+        s = self.store
+        ap = s.get_approval(user_id, approval_id)
+        s.require_approver(user_id, ap)
+        if ap["status"] != "pending":
+            raise Invalid(f"Request is already {ap['status']}.")
+        if not approve:
+            if ap["proposal_id"]:
+                self.reject(user_id, ap["proposal_id"], via_harness=True)
+            s.finish_approval(approval_id, "rejected", user_id)
+            return s.get_approval(user_id, approval_id)
+        if s.get_agent(user_id, ap["agent_id"])["status"] == "archived":
+            raise Invalid("This agent is archived; reject the request instead.")
+        if ap["proposal_id"]:
+            if edited_input and edited_input.get("companion_id") not in (None, ap["tool_input"].get("companion_id")):
+                raise Forbidden("'companion_id' cannot be changed in the preview.")
+            try:
+                prop = self.approve(user_id, ap["proposal_id"], edited_input, via_harness=True)
+            except (Invalid, ValueError, NotFound, Forbidden):
+                # Edit-lock refusals leave the proposal PENDING, so the card stays open.
+                if self.get(user_id, ap["proposal_id"])["status"] == "FAILED":
+                    s.finish_approval(approval_id, "failed", user_id,
+                                      self.get(user_id, ap["proposal_id"])["result"])
+                raise
+            s.finish_approval(approval_id, "approved", user_id, prop["result"], prop["payload"])
+            return s.get_approval(user_id, approval_id)
+        # post_message: only the text may be edited.
+        tool_input = dict(ap["tool_input"])
+        if edited_input:
+            if set(edited_input) - {"content"}:
+                raise Forbidden("Only the message text can be edited.")
+            tool_input["content"] = str(edited_input.get("content") or "").strip()
+            if not tool_input["content"]:
+                raise Invalid("The message text can't be empty.")
+        try:
+            msg = s.post_agent_message(user_id, ap["agent_id"], tool_input["channel_id"], tool_input["content"],
+                                       thread_id=tool_input.get("thread_id"), trigger_message_id=ap["message_id"])
+        except (Invalid, NotFound, Forbidden) as exc:
+            s.finish_approval(approval_id, "failed", user_id, {"error": str(exc)}, tool_input)
+            raise
+        s.finish_approval(approval_id, "approved", user_id, {"message_id": msg["id"]}, tool_input)
+        return s.get_approval(user_id, approval_id)
 
     def _default_companion(self, user_id: str, ws: str) -> str:
         comps = self.store.list_companions(user_id, ws)

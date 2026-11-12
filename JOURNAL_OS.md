@@ -27,7 +27,7 @@ Python 3.10+ standard library only. No pip install is needed to run it.
 python3 -m unittest discover -s tests -v
 ```
 
-Result on 2026-11-11: **42 tests, all passing** (21 existing + 21 new in `tests/test_journal_os.py`).
+Result on 2026-11-12: **73 tests, all passing** (24 in `tests/test_journal_os.py`, 28 in `tests/test_agent_harness.py`, 21 for the older modules).
 
 | Area | Tests |
 |---|---|
@@ -38,6 +38,11 @@ Result on 2026-11-11: **42 tests, all passing** (21 existing + 21 new in `tests/
 | Authorization | another user gets 403 on read, write, command and export; viewer role can read but not write; only the owner approves memories; missing or forged token gets 401 |
 | Sandbox | session runs from the companion calendar, writes a fictional entry, leaves personal events unchanged, never includes approved memory text, runs once; refuses personal events |
 | Restart persistence | starts the real server process, completes the whole journey over HTTP, kills the process, starts a new one on the same file, and checks events, the journal link and body, the sandbox entry, the approved memory and the session token |
+| Agent harness: schema | the five tables exist; a database from before the harness gains them on open and keeps its data; agent tools match the existing action whitelist |
+| Agent harness: channels | slug names, duplicates and the reserved `dm-` prefix refused; private channels and DMs hidden from non-members; DMs reused and closed to third members; archive and last-owner rules; viewers read but can't post; members must belong to the workspace |
+| Agent harness: agents | defaults (handle, `memory_path`, model `none`, grants); 11 invalid inputs refused with nothing half-created; only the owner creates or edits; grants are `propose` only and can be revoked; bootstrap is idempotent; `MEMORY.md` shows approved memories only |
+| Agent harness: messages | @mentions resolve only to agents in the channel; threads stay one level deep; listing and limits; agents must be active posting members; reply chains stop after 4 hops |
+| Agent harness: approvals | a tool call saves nothing until approved; approve runs it, reject doesn't; mixed outcomes; agent proposals can't be approved from the command bar; 6 kinds of bad tool call write nothing; memory tools need a ledger and still need ledger approval; only the owner decides; edits can't retarget; failures are recorded; `post_message` posts only after approval; other workspaces and private channels stay closed; a pending approval survives a restart |
 
 **Browser end-to-end and recording:** `scripts/record_demo.py` drives the real UI in headless Chromium, restarts the server partway through, and saves `journey.webm` and screenshots. On 2026-11-11 it passed 11/11 checks with no page errors. It needs `pip install playwright && python -m playwright install chromium`.
 
@@ -56,9 +61,9 @@ os/                     Journal OS front end (vanilla JS, no build step)
   os.js                 planner (day/week/month, drag to move), journal, companion, together
 journal_os/
   schema.sql            Journal OS tables (separate from the kernel's tables)
-  store.py              data layer; every method checks workspace role first
+  store.py              data layer; every method checks workspace role first (now also channels, agents, messages, approvals)
   interpreter.py        deterministic NL → whitelisted action; LLM adapter interface
-  actions.py            proposal → approve/reject → execute; sandbox simulation
+  actions.py            proposal → approve/reject → execute; agent tool-call decisions; sandbox simulation
   registry.py           shared app registry with honest status labels
   server.py             HTTP routes (/api/os/*) + local server
 skeleton/interfaces.py  existing Animal Scrypt kernel (companions, memory ledger), reused as-is
@@ -71,25 +76,99 @@ api/index.py            existing Vercel gateway; now forwards /api/os/* to Journ
 - Memories: a companion can only *propose*. Only the workspace **owner** can approve, reject or forget a memory. Exports contain approved memories only.
 - Companions get `propose` grants on planner, journal, memory and companion calendar (`access_grants`). They never get `write`.
 - The sandbox reads only companion names, never memories. It writes only companion-calendar events and journal entries tagged `fictional`, and it labels its output as simulated.
+- Agents (see [Agent harness](#agent-harness-foundation)) can post text. Every tool call they make waits as a `pending` approval. Planner, journal and memory tools reuse the same proposal pipeline as typed requests.
 
 **Database schema** (one SQLite file)
 
 | Table | Purpose |
 |---|---|
-| `users`, `sessions` | local profiles; only the SHA-256 hash of each session token is stored |
+| `users`, `sessions` | local profiles. Session tokens are HMAC-signed and never stored, so the `sessions` table is unused. |
 | `workspaces`, `workspace_memberships` | personal or shared spaces; roles owner, editor, viewer |
 | `access_grants` | per-module permissions for companions and other grantees |
 | `events` | personal **and** companion calendars (`calendar` column); kind event/task/reminder/routine; recurrence none/daily/weekly |
 | `journal_entries` | title, body, tags, `event_id` link, origin `user` or `companion_sandbox` |
 | `companions`, `memory_records` | **existing Animal Scrypt tables** (PROPOSED → APPROVED → DELETED) |
 | `workspace_companions`, `memory_links` | tie kernel companions and memories to a workspace, journal entry and event |
-| `action_proposals` | every interpreted request with its status (PENDING, EXECUTED, REJECTED, FAILED), payload and result |
-| `audit_log` | every write, including where it came from (manual, command, sandbox, import) |
+| `action_proposals` | every interpreted request with its status (PENDING, EXECUTED, REJECTED, FAILED), payload and result. `source` is `command` for typed requests and `agent:<id>` for agent tool calls |
+| `audit_log` | every write, including where it came from (manual, command, agent, sandbox, import) |
+| `channels` | Slack-style rooms per workspace: `public`, `private`, `dm`, `agent-room`; shared `instructions` every agent in the room receives; `archived_at` |
+| `channel_members` | who is in a channel: `human`, `agent` or `companion`; role `owner`, `member` or `observer` (observers read only) |
+| `agents` | name, `@handle`, role, `system_prompt`, `model` (`none` until a runtime exists), owner, optional linked companion (whose memory ledger the agent uses), status `active`/`paused`/`archived`, `memory_path`, `monthly_budget_usd` |
+| `messages` | channel posts and one-level threads (`thread_id` = root). `author_type` `human`, `agent` or `system`; `mentions_json`, `tool_calls_json`, `approval_status` (none, pending, approved, rejected, mixed), and `hop`, the agent reply depth |
+| `approvals` | one row per agent tool call: `tool_name`, `tool_input_json`, status `pending` → `approved` / `rejected` / `failed`, `decided_by`, result, and `proposal_id` linking planner/journal/memory tools to `action_proposals` |
 
 **API** (Bearer token from `POST /api/os/session`)
 `GET/POST /api/os/w/{ws}/events` · `GET/POST/DELETE /api/os/events/{id}` · `POST /api/os/events/{id}/run-sandbox` · `GET/POST /api/os/w/{ws}/journal` · `POST/DELETE /api/os/journal/{id}` · `GET /api/os/w/{ws}/companions[/{cid}/export]` · `GET/POST /api/os/w/{ws}/memories` · `POST /api/os/memories/{id}/review|forget` · `POST /api/os/w/{ws}/commands` · `GET /api/os/w/{ws}/actions` · `POST /api/os/actions/{id}/approve|reject` · `GET /api/os/w/{ws}/audit|grants|export` · `POST /api/os/w/{ws}/import|members` · `GET /api/os/health|registry|me`
 
 **Path to a personal device.** The server is a single Python process on the standard library, using one SQLite file. It doesn't need a network and runs unchanged on a Raspberry Pi-class machine. The `LanguageModelAdapter` interface in `interpreter.py` is where a local model would plug in, and its output would still go through `validate_action` and user approval.
+
+---
+
+## Agent harness (foundation)
+
+The goal is a Slack-style space inside the journal, where you, your companions and AI agents work in channels. You @mention an agent, it does the work, and you approve anything that changes your data. This step adds only the data layer: tables, store methods and tests. The model runtime (Prompt 2) and the chat UI (Prompt 3) build on it. Nothing here changes the planner, journal or memory flows; the browser journey still passes 11/11.
+
+**Where the design comes from**
+
+| Source | What this layer takes from it |
+|---|---|
+| [OpenMausBot](https://github.com/milind-soni/OpenMausBot) ("maus bot"), the open-source Grok Bot alternative, Apache-2.0 | Every channel has its own instructions and agent roster. Risky actions become Allow/Deny cards (its "permission broker"). One harness owns all agents, and an unknown model driver shows as unavailable instead of crashing. Shared team packages never carry credentials, permissions or memory. |
+| [agentes-chat](https://github.com/agentes-chat/agentes-chat), the open-source "team + agents in channels" workspace from the linked X post, AGPL-3.0 | Messages record the author type, the agents they mention, and a **hop** counter that stops agents from replying to each other forever. Agents have an owner and a monthly budget. A run can pause while it waits for approval. *Only the design was used. Copying its code would put this repo under the AGPL.* |
+| Nick Vasilescu, "Grok Bot Cut My Limits… So I Built My Own" | An orchestrator agent can direct other agents. Each agent may later get its own computer. API keys stay on the server. |
+| Code With Antonio, "Build Your Own Personal AI Agent From Scratch" | Telegram and iMessage are just more channels. Tool use runs as background jobs inside a sandbox. |
+| Forward Pass, "I Built An LLM From Scratch in 30 Minutes" | A 31M-parameter model trained locally could fill `model` for an offline companion device. |
+| Practical AI with Azou, "DeepSeek + REA To Clone Anything" | Reverse-engineering an existing app (REA) is how to study a bot's behaviour before rebuilding it. This data layer didn't need it. |
+
+**How an agent will use the tables**
+
+1. You post in `#build-log`: *"@scout book a build session tomorrow at 11"*. `post_message` saves it with `mentions = [scout]` and `hop = 0`.
+2. The runtime (Prompt 2) sees the mention and builds the agent's context from:
+   - the channel's `instructions`;
+   - the agent's `system_prompt`;
+   - recent messages;
+   - `render_agent_memory`, which includes approved memories only.
+3. The runtime calls `post_agent_message(user, agent, channel, text, tool_calls=[{"tool": "create_event", "input": {...}}], trigger_message_id=…)`. Before writing anything, the store checks:
+   - the agent is active and a posting member of the channel;
+   - the hop limit;
+   - the tool whitelist;
+   - the agent's `propose` grant;
+   - the shape of the input.
+
+   It then saves the message with `approval_status = pending`, one `approvals` row per tool call, and a linked `PENDING` row in `action_proposals` for planner, journal and memory tools.
+4. The approval card shows the request's `summary`. The workspace owner or the agent's owner calls `ActionService.decide_tool_call(user, approval_id, approve, edited_input)`.
+   - **Approve** runs the call through `ActionService.approve`, with the same validator, edit locks and executor as typed requests.
+   - **Reject** marks both rows rejected.
+   - If the call fails when it runs, it is recorded as `failed` along with the error.
+5. The message's `approval_status` becomes approved, rejected or mixed. The audit log records the write as `via: agent`.
+
+**Rules the tests enforce**
+- Agents can write chat text freely, but every tool call they make waits for approval. Your own actions are not gated, just as manual planner edits aren't.
+- An agent's proposal can't be approved or rejected from the command bar. That keeps the approval card and the proposal from drifting apart.
+- `journal_entries` and `memory_records` stay the source of truth:
+  - An agent can propose memories only to its linked companion's ledger.
+  - Approving that tool call creates a *PROPOSED* memory, which the owner still has to approve in the ledger.
+  - `memory_path` points to a readable `MEMORY.md` export rebuilt from the ledger. Nothing reads that file back.
+- Agents only ever get `propose` grants (planner, journal, memory, companion_calendar, channels), never `write`. Grants can be revoked.
+- Only the workspace owner creates agents. Only the workspace owner or the agent's owner decides their requests.
+- Reply chains stop after 4 hops, and each message can carry at most 5 tool calls.
+- Private channels and DMs are hidden from non-members, including in the approvals list.
+
+**Store methods**
+
+| Area | Methods |
+|---|---|
+| Channels | `create_channel`, `open_dm`, `get_channel`, `list_channels`, `archive_channel`, `add_channel_member`, `remove_channel_member`, `list_channel_members` |
+| Agents | `create_agent`, `get_agent`, `list_agents`, `update_agent` (including `resources` grants), `agent_may`, `render_agent_memory`, `bootstrap_harness` (creates `#general` and a PATCH agent linked to the PATCH ledger; safe to call repeatedly) |
+| Messages | `post_message` (people), `post_agent_message` (agents; tool calls become approvals), `get_message`, `list_messages` (top level or one thread) |
+| Approvals | `get_approval`, `list_approvals`, `require_approver`, `finish_approval` (internal); deciding is `ActionService.decide_tool_call` |
+
+**Left for the next prompts**
+- **Prompt 2: runtime.**
+  - A driver per model provider; a provider that isn't configured reports itself unavailable.
+  - An `agent_runs` queue with one run per agent per trigger message.
+  - A usage ledger that enforces `monthly_budget_usd`.
+  - HTTP routes for everything above.
+- **Prompt 3: Slack-style UI.** A channel sidebar, threads, approval cards and an agent directory.
 
 ---
 
@@ -115,6 +194,9 @@ api/index.py            existing Vercel gateway; now forwards /api/os/* to Journ
 | Shared workspaces UI, invitations, mutual consent | **Planned** (backend memberships and roles exist; there is no UI) |
 | Cross-account companion play | **Disabled** until identity verification ships |
 | World module, device integration | **Planned** |
+| Agent harness data layer: channels, members, agents, messages, approvals | **Working** (store + tests; no HTTP routes or UI yet) |
+| Agent runtime (models answering @mentions) and the channel UI | **Planned**: Prompts 2 and 3 |
+| Agent budgets | **Stored only**: `monthly_budget_usd` is saved but nothing spends or enforces it until the runtime exists |
 
 ## Known limitations
 
