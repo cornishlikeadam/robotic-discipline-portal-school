@@ -170,8 +170,10 @@ async function bnLoad() {
     if (!agent) { bnDrawNoAgent(); return; }
     B.agentId = agent.id;
     const sub = $('#bn-sub');
-    sub.textContent = `with ${agent.name}${agent.model === 'none' ? ' · stand-in' : ''}`;
-    sub.title = agent.model === 'none' ? 'No model is connected yet, so replies come from a rule-based stand-in.' : agent.model;
+    const rt = agentRuntime(agent);
+    sub.textContent = `with ${agent.name} · ${rt.kind === 'model' ? shortModel(rt.model) : 'stand-in'}`;
+    sub.title = rt.kind === 'model' ? `Replies come from ${rt.model}${rt.provider ? ` via ${rt.provider}` : ''}. Changes still wait for your approval.`
+      : 'No model is connected, so replies come from a rule-based stand-in.';
     $('#bn-input').placeholder = `Message ${agent.name}`;
     if (S.ws.role === 'viewer') { bnDrawNote('You have view-only access, so you can’t chat with agents in this workspace.'); return; }
     if (!B.channel || !B.channel.dm_with || B.channel.dm_with.member_id !== agent.id) {

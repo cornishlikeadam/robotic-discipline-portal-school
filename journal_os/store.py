@@ -156,6 +156,7 @@ class JournalStore:
         # Columns added after a table first shipped. CREATE IF NOT EXISTS
         # can't add them to an existing database, so add them here.
         self._ensure_column("messages", "context_json", "TEXT NOT NULL DEFAULT '{}'")
+        self._ensure_column("messages", "runtime", "TEXT NOT NULL DEFAULT ''")
         self.conn.commit()
 
     def _ensure_column(self, table: str, column: str, decl: str) -> None:
@@ -1092,10 +1093,10 @@ class JournalStore:
     def _insert_message(self, row: Dict[str, Any]) -> None:
         self.conn.execute(
             "INSERT INTO messages (id, workspace_id, channel_id, thread_id, author_id, author_type, content,"
-            " mentions_json, tool_calls_json, context_json, approval_status, hop, created_at) VALUES (:id,"
+            " mentions_json, tool_calls_json, context_json, runtime, approval_status, hop, created_at) VALUES (:id,"
             " :workspace_id, :channel_id, :thread_id, :author_id, :author_type, :content, :mentions_json,"
-            " :tool_calls_json, :context_json, :approval_status, :hop, :created_at)",
-            {"context_json": "{}", **row},
+            " :tool_calls_json, :context_json, :runtime, :approval_status, :hop, :created_at)",
+            {"context_json": "{}", "runtime": "", **row},
         )
 
     CONTEXT_VIEWS = ("planner", "journal", "companion", "together", "channels")
@@ -1216,10 +1217,11 @@ class JournalStore:
 
     def post_agent_message(self, user_id: str, agent_id: str, channel_id: str, content: str = "",
                            tool_calls: Optional[List[Dict[str, Any]]] = None, thread_id: Optional[str] = None,
-                           trigger_message_id: Optional[str] = None) -> Dict[str, Any]:
+                           trigger_message_id: Optional[str] = None, runtime: str = "") -> Dict[str, Any]:
         """An agent posts, acting for the signed-in person whose message woke it.
 
-        The text is stored as written. Each tool call becomes a pending
+        The text is stored as written. `runtime` labels what wrote it: a model
+        id, or 'stand-in' for the rule-based fallback (see harness.py). Each tool call becomes a pending
         approval (plus a PENDING action_proposals row for planner, journal and
         memory tools); none of them runs here.
         """
@@ -1272,7 +1274,7 @@ class JournalStore:
             "id": msg_id, "workspace_id": ws, "channel_id": channel_id, "thread_id": root, "author_id": agent_id,
             "author_type": "agent", "content": content, "mentions_json": json.dumps(self._mentions(channel_id, content)),
             "tool_calls_json": json.dumps(recorded), "approval_status": "pending" if recorded else "none",
-            "hop": hop, "created_at": now,
+            "runtime": str(runtime or "")[:120], "hop": hop, "created_at": now,
         })
         for kind, values in rows_to_write:
             if kind == "proposal":

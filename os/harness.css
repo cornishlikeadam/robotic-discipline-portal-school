@@ -67,6 +67,7 @@
 .hx-meta time { font: 12px var(--mono); color: var(--text-dim); }
 .chip.agent { background: var(--cyan); color: #000; }
 .chip.stub { background: transparent; color: var(--text-dim); border: 1px dashed var(--steel); }
+.chip.model { display: inline-block; text-transform: none; background: transparent; color: var(--cyan); border: 1px solid var(--cyan); max-width: 22ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .hx-text { margin: 2px 0 0; overflow-wrap: anywhere; }
 .hx-ctx { margin: 4px 0 0; font: 12px var(--mono); color: var(--text-dim); overflow-wrap: anywhere; }
 .mention { color: var(--cyan); background: rgba(92, 225, 230, .14); padding: 0 3px; border-radius: 2px; font-weight: 700; }

@@ -12,6 +12,7 @@ Portal School gateway (api/index.py), so /studio, /zine, /gamified keep working.
 from __future__ import annotations
 
 import argparse
+import contextlib
 import json
 import mimetypes
 import os
@@ -22,7 +23,7 @@ import time
 import urllib.parse
 from concurrent.futures import ThreadPoolExecutor
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Dict, Iterator, Optional, Tuple
 
 from journal_os import harness
 from journal_os.automations import AutomationService
@@ -64,6 +65,11 @@ def sse_frames(feed: Dict[str, Any], retry: Optional[int] = None) -> str:
     return "".join(parts)
 
 
+def _with_runtime(agent: Dict[str, Any]) -> Dict[str, Any]:
+    """Add what answers for the agent (a model id, or the stand-in) for the UI. No secrets."""
+    return {**agent, "runtime": harness.describe_runtime(agent)}
+
+
 def default_db_path() -> Tuple[str, str]:
     """Returns (path, storage_mode). Serverless /tmp is flagged as ephemeral."""
     explicit = os.environ.get("JOURNAL_OS_DB")
@@ -81,13 +87,28 @@ class JournalOSApp:
         self.storage_mode = storage_mode or (mode if db_path is None else "durable")
         self.store = JournalStore(self.db_path)
         self.actions = ActionService(self.store)
-        self.automations = AutomationService(self.store)
         # One shared SQLite connection: serverless runtimes may call handle()
         # from several threads at once, so requests take turns.
         self._lock = threading.Lock()
+        self.automations = AutomationService(self.store, unlocked=self._unlocked)
 
     def close(self) -> None:
         self.store.close()
+
+    @contextlib.contextmanager
+    def _unlocked(self) -> Iterator[None]:
+        """Let other requests use the database while this one waits on a model
+        provider (up to JOURNAL_OS_LLM_TIMEOUT seconds). The caller holds the
+        lock; it gets it back before touching the database again. Nothing is
+        released mid-transaction."""
+        if self.store.conn.in_transaction:
+            yield
+            return
+        self._lock.release()
+        try:
+            yield
+        finally:
+            self._lock.acquire()
 
     def tick_automations(self, now: Optional[str] = None) -> int:
         """Run every due automation on this machine's clock. The local server
@@ -226,16 +247,16 @@ class JournalOSApp:
                 return ok(200, s.open_dm(uid, ws, d.get("member_id", ""), d.get("member_type", "agent")))
             if coll == "agents":
                 if method == "GET":
-                    return ok(200, s.list_agents(uid, ws, q.get("archived") == "1"))
+                    return ok(200, [_with_runtime(x) for x in s.list_agents(uid, ws, q.get("archived") == "1")])
                 if method == "POST":
-                    return ok(201, s.create_agent(uid, ws, d))
+                    return ok(201, _with_runtime(s.create_agent(uid, ws, d)))
             if coll == "approvals" and method == "GET":
                 status = q.get("status", "pending")
                 return ok(200, s.list_approvals(uid, ws, None if status == "all" else status))
             if coll == "harness" and sub == "bootstrap" and method == "POST":
                 boot = s.bootstrap_harness(uid, ws)
                 self.automations.ensure_defaults(uid, ws, boot["agent"]["id"], boot["channel"]["id"], d.get("now"))
-                return ok(200, boot)
+                return ok(200, {**boot, "agent": _with_runtime(boot["agent"])})
             if coll == "automations":
                 if method == "GET" and not sub:
                     return ok(200, self.automations.list(uid, ws, q.get("now")))
@@ -286,7 +307,7 @@ class JournalOSApp:
                     return ok(200, s.list_messages(uid, rid, q.get("thread") or None, int(q.get("limit") or 100)))
                 if verb == "messages" and method == "POST":
                     msg = s.post_message(uid, rid, d.get("content", ""), d.get("thread_id"), d.get("context"))
-                    replies = harness.respond_to(s, uid, msg, d.get("now"))
+                    replies = harness.respond_to(s, uid, msg, d.get("now"), unlocked=self._unlocked)
                     return ok(201, {"message": msg, "replies": replies})
                 if verb == "members" and method == "POST":
                     return ok(200, s.add_channel_member(uid, rid, d.get("member_id", ""), d.get("member_type", "agent"),
@@ -304,9 +325,9 @@ class JournalOSApp:
                     return ok(200, a.decide_tool_call(uid, rid, verb == "approve", d.get("input") or None))
             if kind == "agents":
                 if method == "GET" and not verb:
-                    return ok(200, s.get_agent(uid, rid))
+                    return ok(200, _with_runtime(s.get_agent(uid, rid)))
                 if method == "POST" and not verb:
-                    return ok(200, s.update_agent(uid, rid, d))
+                    return ok(200, _with_runtime(s.update_agent(uid, rid, d)))
                 if method == "GET" and verb == "memory":
                     return ok(200, s.render_agent_memory(uid, rid))
             if kind == "automations" and method == "POST":

@@ -22,14 +22,21 @@ was running catches up once, later in the same day (or week), never for an
 earlier one. Times are local wall-clock time, like the rest of the planner;
 the browser sends its own clock so a server in another timezone (Vercel runs
 in UTC) still posts the morning brief in the person's morning.
+
+When a model is configured (see harness.ModelConfig), the morning brief and
+weekly review are reworded by it in the agent's voice. The facts still come
+from the code below; if the model fails, or its rewrite drops a time, the
+template text is posted as before. The evening prompt is never reworded.
 """
 
 from __future__ import annotations
 
+import contextlib
 import datetime as dt
 import re
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Callable, ContextManager, Dict, List, Optional, Tuple
 
+from journal_os import harness
 from journal_os.store import Forbidden, Invalid, JournalStore, NotFound, _id, utc_now
 
 KINDS: Dict[str, Dict[str, Any]] = {
@@ -109,8 +116,10 @@ def _event_line(ev: Dict[str, Any]) -> str:
 
 
 class AutomationService:
-    def __init__(self, store: JournalStore) -> None:
+    def __init__(self, store: JournalStore,
+                 unlocked: Callable[[], ContextManager[Any]] = contextlib.nullcontext) -> None:
         self.store = store
+        self.unlocked = unlocked  # lets other requests run while a model rewords a message
 
     # ------------------------------------------------------------ records
     def _row(self, automation_id: str) -> Dict[str, Any]:
@@ -219,16 +228,30 @@ class AutomationService:
         if owner_id:
             sql += " AND owner_id = ?"
             args.append(owner_id)
-        return [self._run(r, when) for r in self.store._all(sql + " ORDER BY created_at", tuple(args))
-                if is_due(r, when)]
+        ran = [self._run(r, when) for r in self.store._all(sql + " ORDER BY created_at", tuple(args))
+               if is_due(r, when)]
+        return [r for r in ran if r]
 
-    def _run(self, row: Dict[str, Any], now: dt.datetime, manual: bool = False) -> Dict[str, Any]:
+    def _run(self, row: Dict[str, Any], now: dt.datetime, manual: bool = False) -> Optional[Dict[str, Any]]:
         s = self.store
         period, _ = period_of(row, now)
+        # Re-read and claim this period before any slow model call, so a tick
+        # that runs meanwhile (the lock is released while the model works)
+        # sees it as done and can't post it twice. Run now always runs.
+        row = self._row(row["id"])
+        if not manual and not is_due(row, now):
+            return None
+        s.conn.execute("UPDATE automations SET last_period = ? WHERE id = ?", (period, row["id"]))
+        s.conn.commit()
         message, error = None, None
         try:
             content, calls = self._compose(row, now)
-            message = s.post_agent_message(row["owner_id"], row["agent_id"], row["channel_id"], content, calls)
+            runtime = harness.STAND_IN
+            if row["kind"] in harness.WORDED_AUTOMATIONS:
+                agent = s.get_agent(row["owner_id"], row["agent_id"])
+                content, runtime = harness.word_automation(agent, row["kind"], content, self.unlocked)
+            message = s.post_agent_message(row["owner_id"], row["agent_id"], row["channel_id"], content, calls,
+                                           runtime=runtime)
         except (Forbidden, Invalid, NotFound) as exc:
             s.conn.rollback()
             error = str(exc)

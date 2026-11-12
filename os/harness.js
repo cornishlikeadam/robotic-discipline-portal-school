@@ -52,6 +52,24 @@ function agentAvatar(a) {
   const tint = AGENT_TINTS[hxHash(a.handle || a.id || a.name || '') % AGENT_TINTS.length];
   return pixelSvg(AGENT_FACE.map((r) => r.replace(/c/g, tint)), 'pix', `${a.name || 'Agent'} avatar`);
 }
+/* What answers for an agent: {kind: 'model', model, provider} or {kind: 'stand-in'} (from the server). */
+const agentRuntime = (a) => (a && a.runtime) || { kind: 'stand-in', model: null, provider: null };
+const agentHasModel = (a) => agentRuntime(a).kind === 'model';
+// Short ids as-is (openrouter/free); long ones by their last part (meta-llama/llama-3.3-70b → llama-3.3-70b).
+const shortModel = (id) => { const s = String(id || ''); return s.length <= 24 ? s : (s.split('/').pop() || s); };
+function hxRuntimeChip(m) {
+  // Messages from before model support have no label; they all came from the stand-in.
+  const label = m.runtime || 'stand-in';
+  if (label === 'stand-in') {
+    return '<span class="chip stub" title="This reply came from the rule-based stand-in, not a model.">Stand-in</span>';
+  }
+  return `<span class="chip model" title="Written by ${esc(label)}. Anything it asks to change still waits for approval.">${esc(shortModel(label))}</span>`;
+}
+function hxModelNote() {
+  const rt = H.agents.map(agentRuntime).find((r) => r.kind === 'model');
+  return rt ? `Agents answer with ${shortModel(rt.model)}${rt.provider ? ` via ${rt.provider}` : ''}. Anything they ask to change still waits for approval.`
+    : 'No model is connected, so agents answer with a rule-based stand-in.';
+}
 function personAvatar(name) {
   return `<span class="hx-initial" aria-hidden="true">${esc(String(name || '?').trim().charAt(0).toUpperCase() || '?')}</span>`;
 }
@@ -138,7 +156,7 @@ async function hxMount() {
         <ul class="hx-list" id="hx-agents" aria-labelledby="hx-ag-label"></ul>
         <div class="hx-side-head"><h2 id="hx-au-label">Automations</h2></div>
         <ul class="hx-list" id="hx-automations" aria-labelledby="hx-au-label"></ul>
-        <p class="muted hx-side-note">No model is connected yet, so agents answer with a rule-based stand-in.</p>
+        <p class="muted hx-side-note" id="hx-model-note"></p>
       </aside>
       <section class="hx-main" id="hx-main" aria-label="Conversation"><p class="loading">Loading channels…</p></section>
       <aside class="hx-thread" id="hx-thread" aria-label="Thread" hidden></aside>
@@ -214,8 +232,10 @@ function hxDrawSide() {
       ${n ? `<span class="hx-count" title="${n} waiting for approval">${n}<span class="sr"> waiting for approval</span></span>` : ''}</a></li>`;
   }).join('') || '<li class="muted">No channels yet.</li>';
   $('#hx-agents').innerHTML = H.agents.map((a) => `<li><button type="button" class="hx-agent" data-dm="${esc(a.id)}" title="Direct message ${esc(a.name)}">
-      ${agentAvatar(a)}<span><b>${esc(a.name)}</b><small>@${esc(a.handle)} · ${a.model === 'none' ? 'stand-in' : esc(a.model)}${a.status !== 'active' ? ` · ${esc(a.status)}` : ''}</small></span></button></li>`).join('')
+      ${agentAvatar(a)}<span><b>${esc(a.name)}</b><small>@${esc(a.handle)} · ${agentHasModel(a) ? esc(shortModel(agentRuntime(a).model)) : 'stand-in'}${a.status !== 'active' ? ` · ${esc(a.status)}` : ''}</small></span></button></li>`).join('')
     || '<li class="muted">No agents yet.</li>';
+  const note = $('#hx-model-note');
+  if (note) note.textContent = hxModelNote();
   hxDrawAutomations();
 }
 
@@ -413,8 +433,7 @@ function hxDrawBanner() {
 function hxMessage(m, inThread) {
   const isAgent = m.author_type === 'agent';
   const agent = isAgent ? H.agentsById[m.author_id] : null;
-  const chips = isAgent ? `<span class="chip agent">Agent</span>${!agent || agent.model === 'none'
-    ? '<span class="chip stub" title="No model is connected. This reply came from the rule-based stand-in.">Stand-in</span>' : ''}` : '';
+  const chips = isAgent ? `<span class="chip agent">Agent</span>${hxRuntimeChip(m)}` : '';
   const foot = !inThread && !m.thread_id ? `<div class="hx-msg-foot">
       ${m.reply_count ? `<button type="button" class="hx-replies" data-thread="${esc(m.id)}">${m.reply_count} ${m.reply_count === 1 ? 'reply' : 'replies'}</button>` : ''}
       ${hxCanPost() ? `<button type="button" class="hx-reply" data-thread="${esc(m.id)}">Reply in thread</button>` : ''}</div>` : '';
@@ -727,7 +746,7 @@ function hxNewChannelDialog() {
         <option value="agent-room">Agent room: public, for agent work</option></select></div>
       <div class="full"><label for="nc-desc">Description</label><input id="nc-desc" maxlength="300" placeholder="What is this channel for?"></div>
       <div class="full"><label for="nc-instr">Instructions for agents (optional)</label>
-        <textarea id="nc-instr" maxlength="4000" placeholder="Shared context every agent here receives once a model is connected."></textarea></div>
+        <textarea id="nc-instr" maxlength="4000" placeholder="Shared context every agent here receives with each message when a model is connected."></textarea></div>
       ${agents.length ? `<fieldset class="full hx-pick"><legend>Agents in this channel</legend>${agents.map((a) => `<label class="check"><input type="checkbox" name="agent" value="${esc(a.id)}" checked> ${esc(a.name)} <small>@${esc(a.handle)}</small></label>`).join('')}</fieldset>` : ''}
     </div>
     <div class="dialog-actions"><div></div><div><button type="button" class="btn" data-cancel>Cancel</button><button class="btn primary" type="submit">Create channel</button></div></div>`,
@@ -756,8 +775,8 @@ function hxNewAgentDialog() {
       <div><label for="na-comp">Memory ledger</label><select id="na-comp"><option value="">None: keeps no memories</option>
         ${S.companions.map((c) => `<option value="${esc(c.id)}">${esc(c.name)}’s ledger</option>`).join('')}</select></div>
       <div><label for="na-model">Model</label><input id="na-model" value="none" maxlength="80" aria-describedby="na-model-note">
-        <small id="na-model-note" class="muted">No model drivers yet; every agent answers with the stand-in.</small></div>
-      <div class="full"><label for="na-prompt">Instructions (optional)</label><textarea id="na-prompt" maxlength="8000" placeholder="How this agent should behave once a model is connected."></textarea></div>
+        <small id="na-model-note" class="muted">“none” uses the server’s model if one is connected, otherwise the rule-based stand-in. “stand-in” always uses the stand-in. Another model id works only if the server allows it.</small></div>
+      <div class="full"><label for="na-prompt">Instructions (optional)</label><textarea id="na-prompt" maxlength="8000" placeholder="How this agent should behave. Sent to the model with every message."></textarea></div>
       <fieldset class="full hx-pick"><legend>It may ask to change</legend>
         ${resources.map(([k, text]) => `<label class="check"><input type="checkbox" name="res" value="${k}"${defaults.has(k) ? ' checked' : ''}> ${text}</label>`).join('')}</fieldset>
     </div>
