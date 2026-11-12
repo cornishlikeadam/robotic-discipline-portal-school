@@ -13,12 +13,14 @@ import hmac
 import json
 import os
 import pathlib
+import re
 import secrets
 import sqlite3
 import time
 import uuid
 from typing import Any, Dict, List, Optional
 
+from journal_os import interpreter
 from skeleton.interfaces import AnimalScryptKernel, ChassisSpec
 
 SCHEMA_PATH = pathlib.Path(__file__).resolve().parent / "schema.sql"
@@ -36,6 +38,42 @@ DEFAULT_COMPANIONS = [
     ("MOSS", "The steady observer. Notices patterns, keeps the log, never rushes a decision."),
     ("PIP", "The bright collaborator. Turns any session into a game with rules everyone can follow."),
 ]
+
+# --------------------------------------------------------------- agent harness
+CHANNEL_TYPES = ("public", "private", "dm", "agent-room")
+OPEN_CHANNEL_TYPES = ("public", "agent-room")  # every workspace member can see and join these
+MEMBER_TYPES = ("human", "agent", "companion")
+CHANNEL_ROLES = ("owner", "member", "observer")  # observers read but never post
+AGENT_STATUSES = ("active", "paused", "archived")
+APPROVAL_STATUSES = ("pending", "approved", "rejected", "failed")
+MAX_AGENT_HOP = 4      # agent replies to agent replies stop at this depth
+MAX_TOOL_CALLS = 5     # per agent message
+# Tool -> resource the agent needs a 'propose' grant on. A tool call only ever
+# creates a pending approval; a person decides whether it runs.
+AGENT_TOOLS = {
+    "create_event": "planner",
+    "update_event": "planner",
+    "delete_event": "planner",
+    "create_journal_entry": "journal",
+    "propose_memory": "memory",
+    "schedule_companion_activity": "companion_calendar",
+    "post_message": "channels",
+}
+PROPOSAL_TOOLS = interpreter.ACTIONS  # these run through ActionService's existing executor
+AGENT_RESOURCES = tuple(sorted(set(AGENT_TOOLS.values())))
+DEFAULT_AGENT_RESOURCES = ("channels", "journal", "memory", "planner")
+TOOL_VERBS = {
+    "create_event": "add an event",
+    "update_event": "change an event",
+    "delete_event": "delete an event",
+    "create_journal_entry": "write a journal entry",
+    "propose_memory": "propose a memory",
+    "schedule_companion_activity": "schedule a companion activity",
+    "post_message": "post in another channel",
+}
+_SLUG_RE = re.compile(r"[^a-z0-9_-]+")
+_MENTION_RE = re.compile(r"(?<![\w@])@([A-Za-z0-9_-]{1,32})")
+_MODEL_RE = re.compile(r"^[A-Za-z0-9._:/-]{1,80}$")
 
 
 class AuthError(Exception):
@@ -79,6 +117,30 @@ def parse_local(value: str) -> dt.datetime:
 
 def fmt_local(value: dt.datetime) -> str:
     return value.strftime("%Y-%m-%dT%H:%M")
+
+
+def _slug(value: Any, what: str = "Name", limit: int = 40) -> str:
+    slug = _SLUG_RE.sub("-", str(value or "").strip().lower()).strip("-")[:limit]
+    if not slug:
+        raise Invalid(f"{what} needs at least one letter or digit.")
+    return slug
+
+
+def _clean_memory_path(value: Any, agent_id: str) -> str:
+    """A relative .md path under the data folder. Never absolute, never '..'."""
+    raw = str(value or f"agents/{agent_id}/MEMORY.md").strip().replace("\\", "/")
+    path = pathlib.PurePosixPath(raw)
+    if (path.is_absolute() or raw.startswith("~") or ".." in path.parts or path.suffix != ".md"
+            or len(raw) > 200):
+        raise Invalid("memory_path must be a relative .md path inside the data folder.")
+    return str(path)
+
+
+def _tool_summary(agent_name: Optional[str], tool: str, tool_input: Dict[str, Any]) -> str:
+    detail = str(tool_input.get("title") or tool_input.get("content") or tool_input.get("event_id") or "")
+    detail = " ".join(detail.split())
+    text = f"{agent_name or 'An agent'} wants to {TOOL_VERBS.get(tool, tool)}"
+    return text + (f": “{detail[:80]}”" if detail else "")
 
 
 class JournalStore:
@@ -600,6 +662,669 @@ class JournalStore:
             self.create_entry(user_id, workspace_id, fields, via="import")
             n_entries += 1
         return {"imported_events": n_events, "imported_entries": n_entries}
+
+    def _insert_proposal(self, proposal: Dict[str, Any]) -> None:
+        """Shared by typed requests (ActionService.propose) and agent tool calls."""
+        self.conn.execute(
+            "INSERT INTO action_proposals (id, workspace_id, user_id, source, input_text, action, payload_json,"
+            " summary, status, created_at) VALUES (:id, :workspace_id, :user_id, :source, :input_text, :action,"
+            " :payload_json, :summary, :status, :created_at)",
+            proposal,
+        )
+
+    # ======================================================= agent harness
+    # Slack-style channels for people, agents and companions. Every method
+    # checks workspace role and channel visibility. Agents can post text, but
+    # each tool call they make is stored as a pending approval and does
+    # nothing until a person decides it (ActionService.decide_tool_call).
+
+    # ----------------------------------------------------------- channels
+    def _membership(self, channel_id: str, member_id: str) -> Optional[Dict[str, Any]]:
+        return self._one("SELECT * FROM channel_members WHERE channel_id = ? AND member_id = ?",
+                         (channel_id, member_id))
+
+    def _require_channel(self, user_id: str, channel_id: str, minimum: str = "viewer") -> Dict[str, Any]:
+        ch = self._one("SELECT * FROM channels WHERE id = ?", (channel_id,))
+        if not ch:
+            raise NotFound("Channel not found.")
+        self.require_role(user_id, ch["workspace_id"], minimum)
+        if ch["type"] not in OPEN_CHANNEL_TYPES and not self._membership(channel_id, user_id):
+            # Private channels and DMs stay invisible to non-members.
+            raise NotFound("Channel not found.")
+        return ch
+
+    def _require_channel_admin(self, user_id: str, ch: Dict[str, Any]) -> None:
+        role = self.require_role(user_id, ch["workspace_id"], "editor")
+        member = self._membership(ch["id"], user_id)
+        if role != "owner" and not (member and member["role"] == "owner"):
+            raise Forbidden("Only the channel owner or the workspace owner can do that.")
+
+    def _add_member_row(self, channel_id: str, member_id: str, member_type: str, role: str) -> None:
+        self.conn.execute(
+            "INSERT INTO channel_members VALUES (?, ?, ?, ?, ?)"
+            " ON CONFLICT(channel_id, member_id) DO UPDATE SET role = excluded.role",
+            (channel_id, member_id, member_type, role, utc_now()),
+        )
+
+    def _member_name(self, member_id: str, member_type: str) -> str:
+        if member_type == "system":
+            return "Journal OS"
+        table, column = {"human": ("users", "display_name"), "agent": ("agents", "name"),
+                         "companion": ("companions", "name")}[member_type]
+        row = self._one(f"SELECT {column} AS name FROM {table} WHERE id = ?", (member_id,))
+        return row["name"] if row else member_id
+
+    def _member_in_workspace(self, workspace_id: str, member_id: str, member_type: str) -> str:
+        """Return the member's display name, or raise if they aren't in this workspace."""
+        if member_type == "human":
+            row = self._one("SELECT u.display_name AS name FROM users u JOIN workspace_memberships m"
+                            " ON m.user_id = u.id WHERE m.workspace_id = ? AND u.id = ?", (workspace_id, member_id))
+        elif member_type == "agent":
+            row = self._one("SELECT name FROM agents WHERE workspace_id = ? AND id = ? AND status != 'archived'",
+                            (workspace_id, member_id))
+        elif member_type == "companion":
+            row = self._one("SELECT c.name FROM companions c JOIN workspace_companions wc ON wc.companion_id = c.id"
+                            " WHERE wc.workspace_id = ? AND c.id = ?", (workspace_id, member_id))
+        else:
+            raise Invalid(f"member_type must be one of {MEMBER_TYPES}")
+        if not row:
+            raise NotFound("That member is not part of this workspace.")
+        return row["name"]
+
+    def _channel_out(self, ch: Dict[str, Any], user_id: str) -> Dict[str, Any]:
+        out = dict(ch)
+        out["member_count"] = self._one("SELECT COUNT(*) AS n FROM channel_members WHERE channel_id = ?",
+                                        (ch["id"],))["n"]
+        out["is_member"] = bool(self._membership(ch["id"], user_id))
+        return out
+
+    def _insert_channel(self, user_id: str, workspace_id: str, name: str, ctype: str, description: str,
+                        instructions: str) -> str:
+        channel_id = _id("chn")
+        self.conn.execute(
+            "INSERT INTO channels (id, workspace_id, name, description, type, instructions, created_by, created_at)"
+            " VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            (channel_id, workspace_id, name, str(description or "").strip()[:300], ctype,
+             str(instructions or "").strip()[:4000], user_id, utc_now()),
+        )
+        self._add_member_row(channel_id, user_id, "human", "owner")
+        self.audit(workspace_id, user_id, "channel.create", "channel", channel_id, {"name": name, "type": ctype})
+        return channel_id
+
+    def create_channel(self, user_id: str, workspace_id: str, name: str, type: str = "public",
+                       description: str = "", instructions: str = "") -> Dict[str, Any]:
+        self.require_role(user_id, workspace_id, "editor")
+        if type not in CHANNEL_TYPES:
+            raise Invalid(f"type must be one of {CHANNEL_TYPES}")
+        if type == "dm":
+            raise Invalid("Use open_dm to start a direct message.")
+        slug = _slug(name, "Channel name")
+        if slug.startswith("dm-"):
+            raise Invalid("Channel names starting with 'dm-' are reserved for direct messages.")
+        if self._one("SELECT 1 FROM channels WHERE workspace_id = ? AND name = ?", (workspace_id, slug)):
+            raise Invalid(f"#{slug} already exists.")
+        channel_id = self._insert_channel(user_id, workspace_id, slug, type, description, instructions)
+        self.conn.commit()
+        return self.get_channel(user_id, channel_id)
+
+    def open_dm(self, user_id: str, workspace_id: str, member_id: str, member_type: str) -> Dict[str, Any]:
+        """Direct message between the caller and one person, agent or companion. Reuses an existing DM."""
+        self.require_role(user_id, workspace_id, "editor")
+        if member_id == user_id:
+            raise Invalid("Pick someone other than yourself.")
+        self._member_in_workspace(workspace_id, member_id, member_type)
+        name = "dm-" + hashlib.sha256("|".join(sorted([user_id, member_id])).encode("utf-8")).hexdigest()[:12]
+        existing = self._one("SELECT id FROM channels WHERE workspace_id = ? AND name = ?", (workspace_id, name))
+        if existing:
+            return self.get_channel(user_id, existing["id"])
+        channel_id = self._insert_channel(user_id, workspace_id, name, "dm", "", "")
+        self._add_member_row(channel_id, member_id, member_type, "member")
+        self.conn.commit()
+        return self.get_channel(user_id, channel_id)
+
+    def get_channel(self, user_id: str, channel_id: str) -> Dict[str, Any]:
+        out = self._channel_out(self._require_channel(user_id, channel_id), user_id)
+        out["members"] = self.list_channel_members(user_id, channel_id)
+        return out
+
+    def list_channels(self, user_id: str, workspace_id: str, include_archived: bool = False) -> List[Dict[str, Any]]:
+        self.require_role(user_id, workspace_id, "viewer")
+        sql = ("SELECT c.* FROM channels c WHERE c.workspace_id = ? AND (c.type IN ('public', 'agent-room')"
+               " OR EXISTS (SELECT 1 FROM channel_members m WHERE m.channel_id = c.id AND m.member_id = ?))")
+        if not include_archived:
+            sql += " AND c.archived_at IS NULL"
+        rows = self._all(sql + " ORDER BY c.type = 'dm', c.name", (workspace_id, user_id))
+        return [self._channel_out(r, user_id) for r in rows]
+
+    def archive_channel(self, user_id: str, channel_id: str) -> Dict[str, Any]:
+        ch = self._require_channel(user_id, channel_id, "editor")
+        self._require_channel_admin(user_id, ch)
+        if not ch["archived_at"]:
+            self.conn.execute("UPDATE channels SET archived_at = ? WHERE id = ?", (utc_now(), channel_id))
+            self.audit(ch["workspace_id"], user_id, "channel.archive", "channel", channel_id)
+            self.conn.commit()
+        return self.get_channel(user_id, channel_id)
+
+    def add_channel_member(self, user_id: str, channel_id: str, member_id: str, member_type: str,
+                           role: str = "member") -> Dict[str, Any]:
+        ch = self._require_channel(user_id, channel_id, "editor")
+        if ch["archived_at"]:
+            raise Invalid("Channel is archived.")
+        if ch["type"] == "dm":
+            raise Invalid("Direct messages have exactly two members.")
+        if role not in CHANNEL_ROLES:
+            raise Invalid(f"role must be one of {CHANNEL_ROLES}")
+        name = self._member_in_workspace(ch["workspace_id"], member_id, member_type)
+        existing = self._membership(channel_id, member_id)
+        if existing and existing["member_type"] != member_type:
+            raise Invalid("member_type does not match the existing membership.")
+        if role == "owner":
+            if member_type != "human":
+                raise Invalid("Only people can own a channel.")
+            self._require_channel_admin(user_id, ch)
+        elif existing and existing["role"] == "owner":
+            self._require_channel_admin(user_id, ch)
+        self._add_member_row(channel_id, member_id, member_type, role)
+        self.audit(ch["workspace_id"], user_id, "channel.member_add", "channel", channel_id,
+                   {"member_id": member_id, "member_type": member_type, "role": role})
+        self.conn.commit()
+        return {"channel_id": channel_id, "member_id": member_id, "member_type": member_type, "role": role,
+                "name": name}
+
+    def remove_channel_member(self, user_id: str, channel_id: str, member_id: str) -> Dict[str, Any]:
+        ch = self._require_channel(user_id, channel_id, "editor")
+        target = self._membership(channel_id, member_id)
+        if not target:
+            raise NotFound("Not a member of this channel.")
+        if member_id != user_id:
+            self._require_channel_admin(user_id, ch)
+        if target["role"] == "owner":
+            owners = self._one("SELECT COUNT(*) AS n FROM channel_members WHERE channel_id = ? AND role = 'owner'",
+                               (channel_id,))["n"]
+            if owners <= 1:
+                raise Invalid("A channel needs at least one owner.")
+        self.conn.execute("DELETE FROM channel_members WHERE channel_id = ? AND member_id = ?", (channel_id, member_id))
+        self.audit(ch["workspace_id"], user_id, "channel.member_remove", "channel", channel_id, {"member_id": member_id})
+        self.conn.commit()
+        return {"channel_id": channel_id, "removed": member_id}
+
+    def list_channel_members(self, user_id: str, channel_id: str) -> List[Dict[str, Any]]:
+        self._require_channel(user_id, channel_id)
+        rows = self._all("SELECT * FROM channel_members WHERE channel_id = ? ORDER BY joined_at, member_id",
+                         (channel_id,))
+        for r in rows:
+            r["name"] = self._member_name(r["member_id"], r["member_type"])
+        return rows
+
+    # ------------------------------------------------------------- agents
+    @staticmethod
+    def _check_resources(resources: Any) -> List[str]:
+        if isinstance(resources, str) or not isinstance(resources, (list, tuple)):
+            raise Invalid("resources must be a list.")
+        bad = set(resources) - set(AGENT_RESOURCES)
+        if bad:
+            raise Invalid(f"Unknown resources {sorted(bad)}; choose from {AGENT_RESOURCES}.")
+        return sorted(set(resources))
+
+    def _clean_agent(self, workspace_id: str, data: Dict[str, Any], agent_id: str,
+                     partial: bool = False) -> Dict[str, Any]:
+        out: Dict[str, Any] = {}
+        if "name" in data or not partial:
+            name = str(data.get("name") or "").strip()
+            if not name:
+                raise Invalid("Agent name is required.")
+            out["name"] = name[:40]
+        if "handle" in data or not partial:
+            handle = _slug(data.get("handle") or out.get("name"), "Handle", limit=32)
+            clash = self._one("SELECT id FROM agents WHERE workspace_id = ? AND handle = ?", (workspace_id, handle))
+            if clash and clash["id"] != agent_id:
+                raise Invalid(f"@{handle} is already taken in this workspace.")
+            out["handle"] = handle
+        for key, limit in (("role", 120), ("system_prompt", 8000)):
+            if key in data or not partial:
+                out[key] = str(data.get(key) or "").strip()[:limit]
+        if "model" in data or not partial:
+            model = str(data.get("model") or "none").strip()
+            if not _MODEL_RE.match(model):
+                raise Invalid("model must be a provider/model id such as 'claude-sonnet-5-5', or 'none'.")
+            out["model"] = model
+        if "status" in data or not partial:
+            status = data.get("status") or "active"
+            if status not in AGENT_STATUSES:
+                raise Invalid(f"status must be one of {AGENT_STATUSES}")
+            out["status"] = status
+        if "monthly_budget_usd" in data or not partial:
+            try:
+                budget = round(float(data.get("monthly_budget_usd") or 0), 2)
+            except (TypeError, ValueError):
+                raise Invalid("monthly_budget_usd must be a number.")
+            if not 0 <= budget <= 10000:  # also rejects NaN and infinity
+                raise Invalid("monthly_budget_usd must be between 0 and 10000.")
+            out["monthly_budget_usd"] = budget
+        if "companion_id" in data or not partial:
+            companion_id = data.get("companion_id") or None
+            if companion_id and not self._one("SELECT 1 FROM workspace_companions WHERE workspace_id = ?"
+                                              " AND companion_id = ?", (workspace_id, companion_id)):
+                raise Invalid("Linked companion must belong to this workspace.")
+            out["companion_id"] = companion_id
+        if "memory_path" in data or not partial:
+            out["memory_path"] = _clean_memory_path(data.get("memory_path"), agent_id)
+        return out
+
+    def _agent_resources(self, workspace_id: str, agent_id: str) -> List[str]:
+        rows = self._all("SELECT resource FROM access_grants WHERE workspace_id = ? AND grantee = ?"
+                         " AND permission = 'propose' AND revoked_at IS NULL", (workspace_id, f"agent:{agent_id}"))
+        return sorted({r["resource"] for r in rows})
+
+    def _set_agent_resources(self, user_id: str, workspace_id: str, agent_id: str, wanted: List[str]) -> None:
+        # Agents only ever get 'propose'. There is no code path that grants them 'write'.
+        current = set(self._agent_resources(workspace_id, agent_id))
+        now = utc_now()
+        for resource in current - set(wanted):
+            self.conn.execute("UPDATE access_grants SET revoked_at = ? WHERE workspace_id = ? AND grantee = ?"
+                              " AND resource = ? AND revoked_at IS NULL",
+                              (now, workspace_id, f"agent:{agent_id}", resource))
+        for resource in set(wanted) - current:
+            self.conn.execute("INSERT INTO access_grants VALUES (?, ?, ?, ?, 'propose', ?, ?, NULL)",
+                              (_id("grant"), workspace_id, f"agent:{agent_id}", resource, user_id, now))
+
+    def agent_may(self, workspace_id: str, agent_id: str, resource: str) -> bool:
+        return bool(self._one(
+            "SELECT 1 FROM access_grants WHERE workspace_id = ? AND grantee = ? AND resource = ?"
+            " AND permission = 'propose' AND revoked_at IS NULL",
+            (workspace_id, f"agent:{agent_id}", resource),
+        ))
+
+    def _agent_out(self, row: Dict[str, Any]) -> Dict[str, Any]:
+        out = dict(row)
+        out["resources"] = self._agent_resources(row["workspace_id"], row["id"])
+        comp = self._one("SELECT name FROM companions WHERE id = ?", (row["companion_id"],)) if row["companion_id"] else None
+        out["companion_name"] = comp["name"] if comp else None
+        return out
+
+    def create_agent(self, user_id: str, workspace_id: str, data: Dict[str, Any]) -> Dict[str, Any]:
+        # Agents can ask to change workspace data, so only the owner creates them.
+        self.require_role(user_id, workspace_id, "owner")
+        agent_id = _id("agt")
+        clean = self._clean_agent(workspace_id, data, agent_id)
+        resources = self._check_resources(data.get("resources", DEFAULT_AGENT_RESOURCES))
+        now = utc_now()
+        row = {"id": agent_id, "workspace_id": workspace_id, "owner_id": user_id, "created_at": now,
+               "updated_at": now, **clean}
+        self.conn.execute(
+            "INSERT INTO agents (id, workspace_id, name, handle, role, system_prompt, model, owner_id, companion_id,"
+            " status, memory_path, monthly_budget_usd, created_at, updated_at) VALUES (:id, :workspace_id, :name,"
+            " :handle, :role, :system_prompt, :model, :owner_id, :companion_id, :status, :memory_path,"
+            " :monthly_budget_usd, :created_at, :updated_at)",
+            row,
+        )
+        self._set_agent_resources(user_id, workspace_id, agent_id, resources)
+        self.audit(workspace_id, user_id, "agent.create", "agent", agent_id,
+                   {"name": row["name"], "model": row["model"], "resources": resources})
+        self.conn.commit()
+        return self.get_agent(user_id, agent_id)
+
+    def get_agent(self, user_id: str, agent_id: str) -> Dict[str, Any]:
+        row = self._one("SELECT * FROM agents WHERE id = ?", (agent_id,))
+        if not row:
+            raise NotFound("Agent not found.")
+        self.require_role(user_id, row["workspace_id"], "viewer")
+        return self._agent_out(row)
+
+    def list_agents(self, user_id: str, workspace_id: str, include_archived: bool = False) -> List[Dict[str, Any]]:
+        self.require_role(user_id, workspace_id, "viewer")
+        sql = "SELECT * FROM agents WHERE workspace_id = ?"
+        if not include_archived:
+            sql += " AND status != 'archived'"
+        return [self._agent_out(r) for r in self._all(sql + " ORDER BY name", (workspace_id,))]
+
+    def update_agent(self, user_id: str, agent_id: str, data: Dict[str, Any]) -> Dict[str, Any]:
+        current = self.get_agent(user_id, agent_id)
+        ws = current["workspace_id"]
+        self.require_role(user_id, ws, "owner")
+        resources = self._check_resources(data["resources"]) if "resources" in data else None
+        clean = self._clean_agent(ws, {k: v for k, v in data.items() if k != "resources"}, agent_id, partial=True)
+        if clean:
+            clean["updated_at"] = utc_now()
+            sets = ", ".join(f"{k} = :{k}" for k in clean)
+            self.conn.execute(f"UPDATE agents SET {sets} WHERE id = :id", {**clean, "id": agent_id})
+        if resources is not None:
+            self._set_agent_resources(user_id, ws, agent_id, resources)
+        if clean or resources is not None:
+            fields = sorted(k for k in clean if k != "updated_at") + (["resources"] if resources is not None else [])
+            self.audit(ws, user_id, "agent.update", "agent", agent_id, {"fields": fields})
+            self.conn.commit()
+        return self.get_agent(user_id, agent_id)
+
+    def render_agent_memory(self, user_id: str, agent_id: str) -> Dict[str, Any]:
+        """Readable MEMORY.md for an agent, rebuilt from the approved memory ledger.
+
+        A runtime may write it to `memory_path` and load it into the agent's
+        context. It is an export only: nothing reads the file back, so editing
+        it cannot change what the agent remembers.
+        """
+        agent = self.get_agent(user_id, agent_id)
+        lines = [f"# {agent['name']} — memory", "",
+                 "Generated from the Journal OS memory ledger. Edits to this file are not read back.", "",
+                 f"Role: {agent['role'] or '(none set)'}"]
+        if agent["companion_id"]:
+            memories = self.list_memories(user_id, agent["workspace_id"], companion_id=agent["companion_id"],
+                                          status="APPROVED")
+            lines += ["", f"## Approved memories (ledger: {agent['companion_name']})", ""]
+            lines += [f"- [{m['category']}] {m['content']}" for m in memories] or ["- (none yet)"]
+        else:
+            lines += ["", "No companion ledger is linked, so this agent keeps no memories."]
+        return {"agent_id": agent_id, "path": agent["memory_path"], "markdown": "\n".join(lines) + "\n"}
+
+    def bootstrap_harness(self, user_id: str, workspace_id: str) -> Dict[str, Any]:
+        """Idempotently create #general and a PATCH agent tied to the PATCH companion's ledger."""
+        self.require_role(user_id, workspace_id, "owner")
+        ch = self._one("SELECT id FROM channels WHERE workspace_id = ? AND name = 'general'", (workspace_id,))
+        channel_id = ch["id"] if ch else self.create_channel(
+            user_id, workspace_id, "general", "public", "Everyone in this workspace: people and agents.")["id"]
+        agent = self._one("SELECT id FROM agents WHERE workspace_id = ? AND handle = 'patch'", (workspace_id,))
+        if agent:
+            agent_id = agent["id"]
+        else:
+            comp = self.find_companion(workspace_id, "PATCH")
+            lore = dict(DEFAULT_COMPANIONS)["PATCH"]
+            agent_id = self.create_agent(user_id, workspace_id, {
+                "name": "PATCH", "handle": "patch", "role": "Maker companion: plans build sessions, keeps the build log.",
+                "system_prompt": lore + " You can propose planner, journal and memory changes; a person approves each one.",
+                "companion_id": comp["id"] if comp else None,
+            })["id"]
+        if not self._membership(channel_id, agent_id):
+            self.add_channel_member(user_id, channel_id, agent_id, "agent")
+        return {"channel": self.get_channel(user_id, channel_id), "agent": self.get_agent(user_id, agent_id)}
+
+    # ----------------------------------------------------------- messages
+    def _message_out(self, row: Dict[str, Any]) -> Dict[str, Any]:
+        out = dict(row)
+        out["mentions"] = json.loads(out.pop("mentions_json") or "[]")
+        out["tool_calls"] = json.loads(out.pop("tool_calls_json") or "[]")
+        out["author_name"] = self._member_name(out["author_id"], out["author_type"])
+        if out["thread_id"] is None:
+            out["reply_count"] = self._one("SELECT COUNT(*) AS n FROM messages WHERE thread_id = ?", (out["id"],))["n"]
+        return out
+
+    def _thread_root(self, channel_id: str, thread_id: Optional[str]) -> Optional[str]:
+        if not thread_id:
+            return None
+        root = self._one("SELECT id, channel_id, thread_id FROM messages WHERE id = ?", (thread_id,))
+        if not root or root["channel_id"] != channel_id:
+            raise Invalid("thread_id must be a message in the same channel.")
+        return root["thread_id"] or root["id"]  # replying to a reply joins the same thread
+
+    def _mentions(self, channel_id: str, content: str) -> List[str]:
+        """Ids of active agents in this channel that the text @mentions, in order of appearance."""
+        order: List[str] = []
+        for handle in _MENTION_RE.findall(content):
+            if handle.lower() not in order:
+                order.append(handle.lower())
+        if not order:
+            return []
+        rows = self._all("SELECT a.id, a.handle FROM agents a JOIN channel_members m ON m.member_id = a.id"
+                         " WHERE m.channel_id = ? AND a.status = 'active'", (channel_id,))
+        by_handle = {r["handle"]: r["id"] for r in rows}
+        return [by_handle[h] for h in order if h in by_handle]
+
+    def _insert_message(self, row: Dict[str, Any]) -> None:
+        self.conn.execute(
+            "INSERT INTO messages (id, workspace_id, channel_id, thread_id, author_id, author_type, content,"
+            " mentions_json, tool_calls_json, approval_status, hop, created_at) VALUES (:id, :workspace_id,"
+            " :channel_id, :thread_id, :author_id, :author_type, :content, :mentions_json, :tool_calls_json,"
+            " :approval_status, :hop, :created_at)",
+            row,
+        )
+
+    def post_message(self, user_id: str, channel_id: str, content: str,
+                     thread_id: Optional[str] = None) -> Dict[str, Any]:
+        """A person posts. Posting in a public or agent-room channel joins it."""
+        ch = self._require_channel(user_id, channel_id, "editor")
+        if ch["archived_at"]:
+            raise Invalid("Channel is archived.")
+        content = str(content or "").strip()
+        if not content:
+            raise Invalid("Message is empty.")
+        root = self._thread_root(channel_id, thread_id)
+        member = self._membership(channel_id, user_id)
+        if member and member["role"] == "observer":
+            raise Forbidden("Observers can read this channel but not post.")
+        if not member:
+            self._add_member_row(channel_id, user_id, "human", "member")
+        row = {"id": _id("msg"), "workspace_id": ch["workspace_id"], "channel_id": channel_id, "thread_id": root,
+               "author_id": user_id, "author_type": "human", "content": content[:8000],
+               "mentions_json": json.dumps(self._mentions(channel_id, content)), "tool_calls_json": "[]",
+               "approval_status": "none", "hop": 0, "created_at": utc_now()}
+        self._insert_message(row)
+        self.audit(ch["workspace_id"], user_id, "message.post", "message", row["id"],
+                   {"channel_id": channel_id, "author_type": "human"})
+        self.conn.commit()
+        return self.get_message(user_id, row["id"])
+
+    def _check_post_tool(self, user_id: str, agent: Dict[str, Any], tool_input: Dict[str, Any]) -> Dict[str, Any]:
+        extra = set(tool_input) - {"channel_id", "content", "thread_id"}
+        if extra:
+            raise Invalid(f"Unexpected fields for post_message: {sorted(extra)}")
+        target = self._require_channel(user_id, str(tool_input.get("channel_id") or ""), "editor")
+        if target["workspace_id"] != agent["workspace_id"] or target["archived_at"]:
+            raise Invalid("Target channel is not available.")
+        member = self._membership(target["id"], agent["id"])
+        if not member or member["role"] == "observer":
+            raise Forbidden(f"{agent['name']} is not a posting member of #{target['name']}.")
+        content = str(tool_input.get("content") or "").strip()
+        if not content:
+            raise Invalid("post_message needs content.")
+        out = {"channel_id": target["id"], "content": content[:8000]}
+        root = self._thread_root(target["id"], tool_input.get("thread_id"))
+        if root:
+            out["thread_id"] = root
+        return out
+
+    def _check_tool_calls(self, user_id: str, agent: Dict[str, Any], tool_calls: Any) -> List[Dict[str, Any]]:
+        """Whitelist, permission and shape checks. Runs before anything is written."""
+        if not isinstance(tool_calls, list):
+            raise Invalid("tool_calls must be a list.")
+        if len(tool_calls) > MAX_TOOL_CALLS:
+            raise Invalid(f"At most {MAX_TOOL_CALLS} tool calls per message.")
+        ws = agent["workspace_id"]
+        checked = []
+        for call in tool_calls:
+            if not isinstance(call, dict) or not isinstance(call.get("input", {}), dict):
+                raise Invalid("Each tool call needs a 'tool' name and an 'input' object.")
+            tool, tool_input = call.get("tool"), dict(call.get("input") or {})
+            if tool not in AGENT_TOOLS:
+                raise Invalid(f"Tool '{tool}' is not available to agents.")
+            if not self.agent_may(ws, agent["id"], AGENT_TOOLS[tool]):
+                raise Forbidden(f"{agent['name']} is not allowed to propose {AGENT_TOOLS[tool]} changes.")
+            if tool == "post_message":
+                checked.append({"tool": tool, "input": self._check_post_tool(user_id, agent, tool_input)})
+                continue
+            if tool == "propose_memory":
+                if not agent["companion_id"]:
+                    raise Forbidden(f"{agent['name']} has no companion memory ledger to propose to.")
+                if tool_input.get("companion_id") not in (None, agent["companion_id"]):
+                    raise Forbidden("Agents can only propose memories to their own companion's ledger.")
+                tool_input["companion_id"] = agent["companion_id"]
+            try:
+                interpreter.validate_action(tool, tool_input)
+            except ValueError as exc:
+                raise Invalid(str(exc)) from exc
+            if tool_input.get("event_id"):
+                ev = self._one("SELECT workspace_id FROM events WHERE id = ?", (tool_input["event_id"],))
+                if not ev or ev["workspace_id"] != ws:
+                    raise Invalid("event_id is not an event in this workspace.")
+            checked.append({"tool": tool, "input": tool_input})
+        return checked
+
+    def post_agent_message(self, user_id: str, agent_id: str, channel_id: str, content: str = "",
+                           tool_calls: Optional[List[Dict[str, Any]]] = None, thread_id: Optional[str] = None,
+                           trigger_message_id: Optional[str] = None) -> Dict[str, Any]:
+        """An agent posts, acting for the signed-in person whose message woke it.
+
+        The text is stored as written. Each tool call becomes a pending
+        approval (plus a PENDING action_proposals row for planner, journal and
+        memory tools); none of them runs here.
+        """
+        ch = self._require_channel(user_id, channel_id, "editor")
+        if ch["archived_at"]:
+            raise Invalid("Channel is archived.")
+        agent = self.get_agent(user_id, agent_id)
+        ws = ch["workspace_id"]
+        if agent["workspace_id"] != ws:
+            raise Forbidden("Agent belongs to another workspace.")
+        if agent["status"] != "active":
+            raise Forbidden(f"{agent['name']} is {agent['status']}.")
+        member = self._membership(channel_id, agent_id)
+        if not member or member["role"] == "observer":
+            raise Forbidden(f"{agent['name']} is not a posting member of #{ch['name']}.")
+        hop = 1
+        if trigger_message_id:
+            trigger = self._one("SELECT workspace_id, hop FROM messages WHERE id = ?", (trigger_message_id,))
+            if not trigger or trigger["workspace_id"] != ws:
+                raise NotFound("Trigger message not found.")
+            hop = trigger["hop"] + 1
+        if hop > MAX_AGENT_HOP:
+            raise Invalid(f"Agent reply chain stopped after {MAX_AGENT_HOP} hops.")
+        content = str(content or "").strip()[:8000]
+        calls = self._check_tool_calls(user_id, agent, tool_calls or [])
+        if not content and not calls:
+            raise Invalid("An agent message needs text or a tool call.")
+        root = self._thread_root(channel_id, thread_id)
+
+        # Everything is validated; now write message, proposals and approvals together.
+        now = utc_now()
+        msg_id = _id("msg")
+        recorded, rows_to_write = [], []
+        for call in calls:
+            summary = _tool_summary(agent["name"], call["tool"], call["input"])
+            proposal_id = None
+            if call["tool"] in PROPOSAL_TOOLS:
+                proposal_id = _id("act")
+                rows_to_write.append(("proposal", {
+                    "id": proposal_id, "workspace_id": ws, "user_id": user_id, "source": f"agent:{agent_id}",
+                    "input_text": (content or summary)[:500], "action": call["tool"],
+                    "payload_json": json.dumps(call["input"]), "summary": summary, "status": "PENDING",
+                    "created_at": now}))
+            approval_id = _id("apv")
+            rows_to_write.append(("approval", (approval_id, ws, msg_id, agent_id, call["tool"],
+                                               json.dumps(call["input"]), proposal_id, now)))
+            recorded.append({"tool": call["tool"], "input": call["input"], "approval_id": approval_id,
+                             "summary": summary})
+        self._insert_message({
+            "id": msg_id, "workspace_id": ws, "channel_id": channel_id, "thread_id": root, "author_id": agent_id,
+            "author_type": "agent", "content": content, "mentions_json": json.dumps(self._mentions(channel_id, content)),
+            "tool_calls_json": json.dumps(recorded), "approval_status": "pending" if recorded else "none",
+            "hop": hop, "created_at": now,
+        })
+        for kind, values in rows_to_write:
+            if kind == "proposal":
+                self._insert_proposal(values)
+            else:
+                self.conn.execute(
+                    "INSERT INTO approvals (id, workspace_id, message_id, agent_id, tool_name, tool_input_json,"
+                    " proposal_id, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', ?)", values)
+        self.audit(ws, user_id, "message.post", "message", msg_id,
+                   {"channel_id": channel_id, "author_type": "agent", "agent_id": agent_id, "tool_calls": len(recorded)})
+        for call in recorded:
+            self.audit(ws, user_id, "approval.request", "approval", call["approval_id"],
+                       {"agent_id": agent_id, "tool": call["tool"]})
+        self.conn.commit()
+        return self.get_message(user_id, msg_id)
+
+    def get_message(self, user_id: str, message_id: str) -> Dict[str, Any]:
+        row = self._one("SELECT * FROM messages WHERE id = ?", (message_id,))
+        if not row:
+            raise NotFound("Message not found.")
+        self._require_channel(user_id, row["channel_id"])
+        return self._message_out(row)
+
+    def list_messages(self, user_id: str, channel_id: str, thread_id: Optional[str] = None,
+                      limit: int = 100) -> List[Dict[str, Any]]:
+        """Top-level messages (oldest first, newest `limit`), or one thread: root + replies."""
+        self._require_channel(user_id, channel_id)
+        limit = max(1, min(int(limit), 500))
+        if thread_id:
+            root = self._thread_root(channel_id, thread_id)
+            rows = self._all("SELECT * FROM messages WHERE id = ? OR thread_id = ? ORDER BY created_at, rowid",
+                             (root, root))
+        else:
+            rows = self._all("SELECT * FROM (SELECT *, rowid AS rid FROM messages WHERE channel_id = ? AND thread_id"
+                             " IS NULL ORDER BY created_at DESC, rowid DESC LIMIT ?) ORDER BY created_at, rid",
+                             (channel_id, limit))
+            for r in rows:
+                r.pop("rid", None)
+        return [self._message_out(r) for r in rows]
+
+    # ---------------------------------------------------------- approvals
+    def _approval_out(self, row: Dict[str, Any]) -> Dict[str, Any]:
+        out = dict(row)
+        out["tool_input"] = json.loads(out.pop("tool_input_json"))
+        out["result"] = json.loads(out.pop("result_json")) if out.get("result_json") else None
+        agent = self._one("SELECT name FROM agents WHERE id = ?", (row["agent_id"],))
+        out["agent_name"] = agent["name"] if agent else None
+        msg = self._one("SELECT channel_id FROM messages WHERE id = ?", (row["message_id"],))
+        out["channel_id"] = msg["channel_id"] if msg else None
+        out["summary"] = _tool_summary(out["agent_name"], out["tool_name"], out["tool_input"])
+        return out
+
+    def get_approval(self, user_id: str, approval_id: str) -> Dict[str, Any]:
+        row = self._one("SELECT * FROM approvals WHERE id = ?", (approval_id,))
+        if not row:
+            raise NotFound("Approval not found.")
+        msg = self._one("SELECT channel_id FROM messages WHERE id = ?", (row["message_id"],))
+        self._require_channel(user_id, msg["channel_id"])
+        return self._approval_out(row)
+
+    def list_approvals(self, user_id: str, workspace_id: str, status: Optional[str] = "pending") -> List[Dict[str, Any]]:
+        self.require_role(user_id, workspace_id, "viewer")
+        sql = ("SELECT a.* FROM approvals a JOIN messages m ON m.id = a.message_id JOIN channels c ON c.id = m.channel_id"
+               " WHERE a.workspace_id = ? AND (c.type IN ('public', 'agent-room') OR EXISTS (SELECT 1 FROM"
+               " channel_members cm WHERE cm.channel_id = c.id AND cm.member_id = ?))")
+        args: List[Any] = [workspace_id, user_id]
+        if status:
+            if status not in APPROVAL_STATUSES:
+                raise Invalid(f"status must be one of {APPROVAL_STATUSES}")
+            sql += " AND a.status = ?"
+            args.append(status)
+        return [self._approval_out(r) for r in self._all(sql + " ORDER BY a.created_at, a.rowid", tuple(args))]
+
+    def require_approver(self, user_id: str, approval: Dict[str, Any]) -> None:
+        """Only the workspace owner or the agent's owner decides an agent's tool call."""
+        role = self.require_role(user_id, approval["workspace_id"], "editor")
+        agent = self._one("SELECT owner_id FROM agents WHERE id = ?", (approval["agent_id"],))
+        if role != "owner" and (not agent or agent["owner_id"] != user_id):
+            raise Forbidden("Only the workspace owner or this agent's owner can decide its requests.")
+
+    def finish_approval(self, approval_id: str, status: str, decided_by: str,
+                        result: Optional[Dict[str, Any]] = None,
+                        final_input: Optional[Dict[str, Any]] = None) -> None:
+        """Record a decision. Call through ActionService.decide_tool_call, which runs the tool first."""
+        if status not in ("approved", "rejected", "failed"):
+            raise Invalid("status must be approved, rejected or failed")
+        row = self._one("SELECT workspace_id, message_id, tool_input_json FROM approvals WHERE id = ?"
+                        " AND status = 'pending'", (approval_id,))
+        if not row:
+            raise Invalid("Approval is no longer pending.")
+        self.conn.execute(
+            "UPDATE approvals SET status = ?, result_json = ?, decided_by = ?, decided_at = ?, tool_input_json = ?"
+            " WHERE id = ?",
+            (status, json.dumps(result) if result is not None else None, decided_by, utc_now(),
+             json.dumps(final_input) if final_input is not None else row["tool_input_json"], approval_id),
+        )
+        statuses = [r["status"] for r in self._all("SELECT status FROM approvals WHERE message_id = ?",
+                                                   (row["message_id"],))]
+        if "pending" in statuses:
+            summary = "pending"
+        elif all(s == "approved" for s in statuses):
+            summary = "approved"
+        elif all(s == "rejected" for s in statuses):
+            summary = "rejected"
+        else:
+            summary = "mixed"
+        self.conn.execute("UPDATE messages SET approval_status = ? WHERE id = ?", (summary, row["message_id"]))
+        self.audit(row["workspace_id"], decided_by, f"approval.{status}", "approval", approval_id)
+        self.conn.commit()
 
 
 def _expand(row: Dict[str, Any], lo: dt.datetime, hi: dt.datetime) -> List[Dict[str, Any]]:
