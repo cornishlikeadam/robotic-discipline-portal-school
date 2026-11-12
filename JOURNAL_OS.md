@@ -1,4 +1,6 @@
-# Journal OS — MVP (branch `journal-os-mvp`)
+# Journal OS — MVP
+
+**Live demo (resets):** https://robotic-discipline-portal-school.vercel.app/os/ · **Durable:** run locally (below).
 
 Journal OS is a local-first planner, living journal and companion memory ledger added on top of the existing Portal School app. The map, zine, studio, workspace, data room and their backend are unchanged. The existing Animal Scrypt kernel (`skeleton/interfaces.py`) still owns companion identity and memory records.
 
@@ -117,7 +119,7 @@ api/index.py            existing Vercel gateway; now forwards /api/os/* to Journ
 ## Known limitations
 
 1. **Sign-in is device-trust, with no password.** Anyone who can reach the server can open any profile by name. That is fine on `127.0.0.1`, but do not expose it to the internet with real data. Real authentication (passkeys, or a password plus rate limiting) is the next security task.
-2. **Vercel is not durable.** On Vercel, the API uses `/tmp/journal_os_demo.db`, reports `storage: ephemeral`, and the UI shows a red "Demo storage — resets" badge. A public demo there will lose data on cold starts. Durable cloud storage (Turso/libSQL, Postgres or a small VM with a disk) is not configured, and no public deployment was made from this branch.
+2. **Vercel is not durable.** On Vercel, the API uses `/tmp/journal_os_demo.db`, reports `storage: ephemeral`, and the UI shows a red "Demo storage — resets" badge. A public demo there will lose data on cold starts. Durable cloud storage (Turso/libSQL, Postgres or a small VM with a disk) is not configured. The public demo at https://robotic-discipline-portal-school.vercel.app/os/ runs in this mode; Vercel may also run several instances, each with its own `/tmp`, so a sign-in can occasionally be lost.
 3. **Times are local wall-clock time.** Times are stored without a timezone, which suits one device in one timezone.
 4. **The interpreter is rule-based.** It handles the phrasings in the tests and close variants, and refuses anything else (it shows examples rather than guessing). "At 3" with no AM/PM is read as 3 PM; times from 7 to 11 are read as AM.
 5. **Journal entries are plain text** with tags. There are no images or rich formatting yet.

@@ -8,9 +8,16 @@
 
 ---
 
-## ★ Journal OS MVP (branch `journal-os-mvp`)
+## ★ Journal OS MVP
 
-A planner-first companion environment: natural-language request → preview → approval → saved event → linked journal entry → companion memory approval → still there after restart. Run `python3 -m journal_os.server` and open `http://127.0.0.1:8090/os/`. Architecture, schema, test results, the working-vs-planned table and the demo script are in [`JOURNAL_OS.md`](./JOURNAL_OS.md).
+A planner-first companion environment: natural-language request → preview → approval → saved event → linked journal entry → companion memory approval → still there after restart.
+
+* **[★ Journal OS on Vercel (`/os/`)](https://robotic-discipline-portal-school.vercel.app/os/)** — `https://robotic-discipline-portal-school.vercel.app/os/`
+  * **[Planner (`#planner`)](https://robotic-discipline-portal-school.vercel.app/os/#planner)** · **[Living Journal (`#journal`)](https://robotic-discipline-portal-school.vercel.app/os/#journal)** · **[Companion memory ledger (`#companion`)](https://robotic-discipline-portal-school.vercel.app/os/#companion)** · **[Together sandbox (`#together`)](https://robotic-discipline-portal-school.vercel.app/os/#together)**
+  * ⚠️ **Demo storage:** the Vercel copy keeps data in serverless `/tmp`, so it resets when the function restarts and can sign you out. Don't enter real personal data there.
+* **Local, durable version:** run `python3 -m journal_os.server` and open `http://127.0.0.1:8090/os/`. Data is saved to `data/journal_os.db` and survives restarts.
+
+Architecture, schema, test results, the working-vs-planned table and the demo script are in [`JOURNAL_OS.md`](./JOURNAL_OS.md).
 
 ## Live Gamified Sites (GitHub Pages `github.io` + Vercel Backend)
 
