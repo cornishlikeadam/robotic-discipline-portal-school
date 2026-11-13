@@ -104,11 +104,10 @@ def main() -> None:
             page.screenshot(path=str(out / "03-agent-permissions.png"))
             page.keyboard.press("Escape")
 
-            # Teardown sliders inside the device tab
-            page.click("#dock [data-app=device]")
-            frame = page.frame_locator(".dv-frame iframe")
+            # Sliders in the PATCH line drawing (the pixel world in the device tab has its own journey: device_demo.py)
+            page.goto(f"{base}/os/device/technical.html")
+            frame = page
             expect(frame.locator("#render-status")).to_have_text("Drawing updated", timeout=30000)
-            page.locator(".dv-frame").evaluate("el => el.scrollIntoView({block: 'end'})")
             frame.locator("#settings-toggle").click()
             sliders = frame.locator("#settings-panel pw-slider")
             expect(sliders.first).to_be_visible()

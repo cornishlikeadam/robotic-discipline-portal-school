@@ -280,9 +280,28 @@ Code: `journal_os/automations.py` and the `automations` table in `journal_os/sch
 | Model runtime (drivers, background runs, budgets) | **Planned** |
 | Agent budgets | **Stored only**: `monthly_budget_usd` is saved but not enforced; free-tier daily caps are the only limit on model use |
 
+## Companion Device: the PATCH pixel world
+
+The **Companion Device** tab (`#device`) shows PATCH as a small pixel-art world you can take apart. It is painted entirely in code with the [pixel-worlds](https://github.com/finktheartist/pixel-worlds) kit (MIT): each part on its own layer, lit for the time of day, then snapped to a fixed palette. There are no image files.
+
+- **Parts (11):** head shell, body shell, both ears, microphone array, AI camera, speaker, on-device AI module, battery pack, frame and servos, and the magnetic dock.
+- **Sliders, each showing its value:**
+  - **Explode** spreads the parts or snaps them together.
+  - **Zoom** goes from 100% to 300% and follows the isolated part.
+  - **Battery** fills the cells and turns the status lights lime, gold, then blinking red under 20%.
+  - **Ears** poses them from flopped to perked.
+  - **Time of day** moves the sun or moon in the window and changes the light; at night the lamp comes on.
+- **Isolate:** tap a part in the scene or pick it from the list. The rest dims and its name shows on the workbench.
+- **Colour:** eight swatches recolor the isolated part, or the whole shell when nothing is isolated. **Reset everything** restores the defaults.
+- **Alive when idle:** PATCH blinks, breathes and twitches an ear, and the LEDs run. With reduced motion turned on, it holds still.
+- **Download:** PNG (4× pixel-perfect), SVG (one rectangle run per pixel row) and PDF, each of the whole scene as it looks at that moment.
+- **Concept art:** the outside follows the PATCH renders, and the internals are illustrative.
+
+Files: `os/device/teardown.html` (page and controls), `os/device/patch-world.js` (the scene) and `os/device/pixel-kit.js` (the kit). The earlier line drawing is kept at `os/device/technical.html`, linked from the page; `device/build.cjs` rebuilds it. `scripts/device_demo.py` runs 15 checks: mouse drag, keyboard, every slider, isolate, recolor, reset, the three downloads, frame rate and phone width.
+
 ## Pixel-world controls
 
-Every switch and slider in Journal OS, plus the live indicator in Channels, is drawn as a small PATCH scene. This uses the [pixel-worlds](https://github.com/finktheartist/pixel-worlds) method (MIT): paint the scene, light it, then snap it to a fixed palette. It lives in `os/pixel-controls.js`, one file with no dependencies, and loads on every view. It is also inlined into the Companion Device teardown by `device/build.cjs`. To see them all on one page, open `/os/pixel-controls.html`.
+Every switch and slider in Journal OS, plus the live indicator in Channels, is drawn as a small PATCH scene. This uses the [pixel-worlds](https://github.com/finktheartist/pixel-worlds) method (MIT): paint the scene, light it, then snap it to a fixed palette. It lives in `os/pixel-controls.js`, one file with no dependencies, and loads on every view. The Companion Device page loads it too, and `device/build.cjs` inlines it into the line drawing. To see them all on one page, open `/os/pixel-controls.html`.
 
 | Control | Scene | Where it appears |
 |---|---|---|

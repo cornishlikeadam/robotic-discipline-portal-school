@@ -5,7 +5,7 @@
 // self-contained file with no network requests.
 const path = require('node:path'), fs = require('node:fs');
 const build = require('../tools/teardown/scripts/build-viewer.cjs');
-const here = __dirname, out = path.join(here, '../os/device/teardown.html');
+const here = __dirname, out = path.join(here, '../os/device/technical.html');
 build(path.join(here, 'drawing.json'), out);
 const controls = fs.readFileSync(path.join(here, '../os/pixel-controls.js'), 'utf8').replace(/<\/script/gi, '<\\/script');
 const html = fs.readFileSync(out, 'utf8');

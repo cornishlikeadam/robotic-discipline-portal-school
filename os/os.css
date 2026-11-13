@@ -332,7 +332,7 @@ dl.spec dd { margin: 0; }
 .dv-specs li { display: grid; padding: 6px 12px; border: 2px solid #000; border-radius: 6px; background: var(--ink-2, #1d1b22); box-shadow: 3px 3px 0 #000; }
 .dv-specs b { font-size: 14px; }
 .dv-specs span { font: 11px var(--mono); color: var(--text-dim); text-transform: uppercase; letter-spacing: .06em; }
-.dv-frame { border: 2px solid #000; border-radius: 10px; overflow: hidden; box-shadow: 4px 4px 0 #000; background: #fff; }
+.dv-frame { border: 2px solid #000; border-radius: 10px; overflow: hidden; box-shadow: 4px 4px 0 #000; background: #16141c; }
 .dv-frame iframe { display: block; width: 100%; height: max(520px, calc(100vh - 110px)); border: 0; }
 .dv-note { margin-top: 10px; font-size: 13px; }
 @media (max-width: 640px) { .dv-frame iframe { height: 72vh; } }
