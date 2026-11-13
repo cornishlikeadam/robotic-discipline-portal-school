@@ -30,7 +30,7 @@ body.has-barnacle .view { padding-bottom: 120px; }
 .bn-dock > * { pointer-events: auto; }
 .bn-dock[data-corner$="r"] { right: calc(var(--bn-m) + env(safe-area-inset-right, 0px)); align-items: flex-end; }
 .bn-dock[data-corner$="l"] { left: calc(var(--bn-m) + env(safe-area-inset-left, 0px)); align-items: flex-start; }
-.bn-dock[data-corner^="b"] { bottom: calc(var(--bn-m) + env(safe-area-inset-bottom, 0px)); }
+.bn-dock[data-corner^="b"] { bottom: calc(var(--bn-m) + var(--bn-nav, 0px) + env(safe-area-inset-bottom, 0px)); }
 .bn-dock[data-corner^="t"] { top: calc(var(--bn-top) + env(safe-area-inset-top, 0px)); flex-direction: column-reverse; }
 .bn-dock.bn-dragging { cursor: grabbing; transition: none !important; }
 .bn-dock.bn-dragging .bn-peek { display: none; }
@@ -223,7 +223,8 @@ body.bn-open .bn-dock .bn-mini { display: none; }
   .bn-panel::before { /* grab handle: shows it's a sheet */
     content: ""; position: absolute; top: 6px; left: 50%; width: 36px; height: 4px; margin-left: -18px; border-radius: 2px; background: rgba(255, 255, 255, .22);
   }
-  .bn-head { padding-top: 16px; }
+  .bn-head { padding-top: 16px; touch-action: none; cursor: grab; }
+  body.has-tabbar .barnacle { --bn-nav: 58px; }
   body.bn-open .bn-dock { display: none; }
   body.bn-open { overflow: hidden; } /* the page doesn't scroll behind the sheet */
 }

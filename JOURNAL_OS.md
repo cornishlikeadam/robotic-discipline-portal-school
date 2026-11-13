@@ -214,8 +214,15 @@ Barnacle is built phone first. It behaves like a video that keeps playing in a c
   - Pending: a gold "1 waiting" pill in the header jumps to the first card; cards have a gold outline and 44 px buttons.
   - Failed send: your text is kept, with **Try again**.
   - Model failure: the stand-in answers, and the reply carries a quiet notice.
+- **Gestures.**
+  - Tap the bubble to open the chat. Swipe down on the sheet's header (the grab handle) to close it; a short drag springs back. Close and Escape do the same without a gesture.
+  - Swipe left or right on the page to move between Planner, Living Journal, Companion and Channels. It stops at the ends rather than wrapping. A swipe that starts in a text box, a slider, a planner event, a sideways-scrolling area or a dialog is left alone.
+  - A bottom nav with those four views appears under 640 px, for anyone who doesn't swipe. The bubble sits above it, and it hides while the keyboard is up.
+  - In the planner's month view, tapping a day opens it in the day view, where events are big enough to tap.
+- **Touch.** On touch screens, buttons, fields, channel rows and approval buttons are at least 44 px tall, taps have a visible pressed state, and `touch-action: manipulation` removes the tap delay. Bottom elements respect `env(safe-area-inset-bottom)`.
 - **On a wider screen** the chat is a side panel on the bubble's side, and it stays open as you change views.
 - **Limit.** A web page can't float over other apps or the home screen the way a picture-in-picture video does. Barnacle stays with you everywhere inside Journal OS.
+- **Gesture checks.** `scripts/gestures_demo.py` runs 17 checks with real touch events: the bottom nav, swiping between views, ignored swipes, the sheet's spring-back and swipe-to-close, 44 px targets, the month-to-day tap, and an unchanged desktop.
 - **Checks.** `scripts/barnacle_phone_demo.py` runs 17 checks at 390 × 844 with touch: drag and snap, the sheet, the mini player across views, each state, hiding while typing, tucking on a real touch swipe, reduced motion, and the desktop side panel.
 
 ---

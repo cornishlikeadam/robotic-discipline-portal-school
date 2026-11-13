@@ -336,3 +336,52 @@ dl.spec dd { margin: 0; }
 .dv-frame iframe { display: block; width: 100%; height: max(520px, calc(100vh - 110px)); border: 0; }
 .dv-note { margin-top: 10px; font-size: 13px; }
 @media (max-width: 640px) { .dv-frame iframe { height: 72vh; } }
+
+/* ---------- touch: no tap delay, visible press, 44px targets ---------- */
+a, button, input, select, textarea, label, summary, .card, .slot, .mcell { touch-action: manipulation; }
+html { -webkit-tap-highlight-color: transparent; }
+@media (pointer: coarse), (max-width: 640px) {
+  .btn, .btn.small { min-height: 44px; }
+  .btn.small { padding: 8px 14px; font-size: 15px; }
+  input:not([type=checkbox]):not([type=radio]):not([type=range]), select { min-height: 44px; font-size: 16px; }
+  textarea { font-size: 16px; }
+  #cal-filter { min-height: 44px !important; }
+  .agenda li button, .hx-ch, .hx-agent, .hx-auto, .comp { min-height: 44px; }
+  .hx-replies, .hx-reply { min-height: 44px; padding: 0 8px 0 0; }
+  .hx-msg .hx-reply { opacity: 1; }
+  .apv .btn { min-height: 44px; }
+  .mcell { cursor: pointer; }
+  .mchip { min-height: 22px; }
+  .card:active, .hx-ch:active, .hx-agent:active, .hx-auto:active, .agenda li button:active, .comp:active, .mcell:active { filter: brightness(1.25); }
+  .ev:active { filter: brightness(.9); }
+}
+
+/* ---------- bottom nav (phones): tap alternative to swiping between views ---------- */
+.tabbar { display: none; }
+@media (max-width: 640px) {
+  .tabbar {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 40; display: grid; grid-auto-flow: column; grid-auto-columns: 1fr;
+    padding: 0 max(4px, env(safe-area-inset-right, 0px)) env(safe-area-inset-bottom, 0px) max(4px, env(safe-area-inset-left, 0px));
+    background: var(--ink-2); border-top: 2px solid #000; box-shadow: 0 -6px 18px rgba(0, 0, 0, .35);
+  }
+  .tabbar a {
+    min-height: 56px; display: grid; justify-items: center; align-content: center; gap: 3px; color: var(--text-dim);
+    text-decoration: none; font: 600 11px/1 var(--mono); letter-spacing: .04em; text-transform: uppercase; border-top: 3px solid transparent; margin-top: -2px;
+  }
+  .tabbar .pix { width: 24px; height: 24px; image-rendering: pixelated; opacity: .7; }
+  .tabbar a[aria-current="page"] { color: var(--lime); border-top-color: var(--lime); }
+  .tabbar a[aria-current="page"] .pix { opacity: 1; }
+  .tabbar a:active { background: var(--ink-3); }
+  .tabbar a:focus-visible { outline-offset: -3px; }
+  body.has-tabbar .view { padding-bottom: calc(150px + env(safe-area-inset-bottom, 0px)); }
+  body.has-tabbar .toast { bottom: calc(72px + env(safe-area-inset-bottom, 0px)); }
+  body.has-tabbar .toast:not(.show) { transform: translate(-50%, calc(100% + 140px)); }
+  body.bn-kbd .tabbar { display: none; } /* the keyboard is up: give the space back */
+  .cal-body { max-height: 62dvh; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .view.gs-from-right { animation: gs-right 240ms cubic-bezier(0.2, 0, 0, 1); }
+  .view.gs-from-left { animation: gs-left 240ms cubic-bezier(0.2, 0, 0, 1); }
+}
+@keyframes gs-right { from { opacity: 0; translate: 24px 0; } to { opacity: 1; translate: 0 0; } }
+@keyframes gs-left { from { opacity: 0; translate: -24px 0; } to { opacity: 1; translate: 0 0; } }
