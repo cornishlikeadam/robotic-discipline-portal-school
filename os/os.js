@@ -139,6 +139,7 @@ function signOut(expired = false) {
   if (typeof Harness !== 'undefined') Harness.leave();
   if (typeof Barnacle !== 'undefined') Barnacle.unmount();
   if (typeof AutoTick !== 'undefined') AutoTick.stop();
+  if (typeof Gestures !== 'undefined') Gestures.unmount();
   if (typeof LiveFeed !== 'undefined') LiveFeed.stopAll();
   S.token = null; S.user = null; store.del('token');
   showSignin();
@@ -160,6 +161,7 @@ async function enter() {
   renderDock();
   if (typeof Barnacle !== 'undefined') Barnacle.mount();
   if (typeof AutoTick !== 'undefined') AutoTick.start();
+  if (typeof Gestures !== 'undefined') Gestures.mount();
   if (!location.hash) location.hash = '#planner'; else route();
 }
 
@@ -457,6 +459,11 @@ function drawMonth(cal, start, evs) {
     cell.appendChild(b);
   });
   $$('.mcell', cal).forEach((cell) => {
+    // On a touch screen, tapping a day opens it in the day view, where events are big enough to tap.
+    cell.addEventListener('click', (ev) => {
+      if (ev.target.closest('.mchip') || !window.matchMedia('(pointer: coarse), (max-width: 640px)').matches) return;
+      S.cursor = parseIso(`${cell.dataset.day}T00:00`); S.view = 'day'; store.set('calView', 'day'); viewPlanner();
+    });
     cell.addEventListener('dragover', (ev) => { ev.preventDefault(); cell.classList.add('over'); });
     cell.addEventListener('dragleave', () => cell.classList.remove('over'));
     cell.addEventListener('drop', (ev) => {
