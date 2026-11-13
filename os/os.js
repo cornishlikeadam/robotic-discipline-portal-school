@@ -774,15 +774,14 @@ async function viewTogether() {
 // so it runs in a frame and keeps its own controls, worker and downloads.
 function viewDevice() {
   $('#view').innerHTML = `<div class="view-head"><div><h1>Companion Device</h1>
-      <p>A working teardown of PATCH, the physical companion: switch between exploded and assembled, change the pose and battery under settings, pick a part to isolate it, recolor any part, and download SVG, PNG or PDF.</p></div>
+      <p>PATCH as a small pixel world you can take apart. Slide it open, pose the ears, drain the battery, change the time of day, tap a part to isolate it, and recolor it.</p></div>
       <div class="toolbar"><span class="chip live-partial">Concept</span>
         <a class="btn small" href="/os/device/teardown.html" target="_blank" rel="noopener">Open full screen</a></div></div>
     <ul class="dv-specs" aria-label="Concept specifications">
       <li><b>≈ 198 × 120 × 90 mm</b><span>size</span></li><li><b>ARM + NPU</b><span>on-device AI</span></li>
       <li><b>3,000–4,000 mAh</b><span>4–8 h active</span></li><li><b>Mic array · camera · speaker</b><span>senses</span></li>
       <li><b>Magnetic dock</b><span>pogo-pin charging</span></li></ul>
-    <div class="dv-frame"><iframe src="/os/device/teardown.html" title="PATCH companion teardown: interactive technical illustration" loading="lazy"></iframe></div>
-    <p class="muted dv-note">Concept drawing, not to scale. Proportions follow the PATCH renders; the internals are illustrative and no hardware runtime is connected yet.</p>`;
+    <div class="dv-frame"><iframe src="/os/device/teardown.html" title="PATCH pixel world: an interactive pixel-art model of the companion robot" loading="lazy"></iframe></div>`;
 }
 
 /* ---------------------------------------------------------------- planned / status */

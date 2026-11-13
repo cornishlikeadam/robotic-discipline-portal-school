@@ -37,6 +37,6 @@ APP_REGISTRY = [
     {"id": "collab", "name": "Shared Workspaces", "status": "planned", "route": "#collab", "theme": "steel",
      "blurb": "Backend memberships and role checks exist; invitations, consent flow and UI do not."},
     {"id": "device", "name": "Companion Device", "status": "live-partial", "route": "#device", "theme": "steel",
-     "blurb": "Interactive concept teardown of the PATCH robot: exploded and assembled views, pose and "
-              "battery settings, part colors and SVG/PNG/PDF downloads. No hardware runtime yet."},
+     "blurb": "PATCH as a pixel world you can take apart: explode, pose, battery, time of day, "
+              "isolate and recolor parts, and download PNG, SVG or PDF. No hardware runtime yet."},
 ]

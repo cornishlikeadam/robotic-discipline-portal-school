@@ -23,7 +23,7 @@ npm install                      # jspdf, svg2pdf.js, @fontsource-variable/inter
 node ../tools/teardown/scripts/proof.cjs drawing.json proof/ --quick
 node ../tools/teardown/scripts/proof.cjs drawing.json proof/          # every extreme + occlusion check
 node build.cjs   # builds the viewer and inlines the pixel-world controls
-node ../tools/teardown/scripts/check-viewer.cjs ../os/device/teardown.html check/
+node ../tools/teardown/scripts/check-viewer.cjs ../os/device/technical.html check/
 ```
 
 The model is `device/model.js`; the drawing, parts, parameters and starting colors are in `device/drawing.json`. The tools in `tools/teardown/` are copied from the teardown skill (MIT, github.com/jakubkrehel/skills).
