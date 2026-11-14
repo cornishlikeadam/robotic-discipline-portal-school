@@ -26,6 +26,10 @@ APP_REGISTRY = [
      "permissions": ["channels:post", "approvals:decide(owner)"]},
     {"id": "zine", "name": "Zine", "status": "existing", "route": "/zine", "theme": "riso",
      "blurb": "The original Stage-1 zine terminal view from the Portal School app."},
+    {"id": "cafe", "name": "Robotics Café", "status": "existing",
+     "route": "https://rds-plum.vercel.app/cafe/index.html", "theme": "moss",
+     "blurb": "Local. Surplus. Shared. Savannah food offers, recovery routes, School Points and The First Table. "
+              "Example offers and robot dispatch are simulated; account access and payments are not open yet."},
     {"id": "school", "name": "School", "status": "existing", "route": "/gamified#map", "theme": "chalk",
      "blurb": "World map, IP School exercises and the reengineering lab."},
     {"id": "studio", "name": "Studio", "status": "existing", "route": "/studio", "theme": "blueprint",

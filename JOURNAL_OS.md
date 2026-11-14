@@ -9,6 +9,8 @@ natural-language request → editable preview → approval → saved calendar ev
 
 ---
 
+The main application dock includes **[Robotics Café](https://rds-plum.vercel.app/cafe/index.html)**: Savannah surplus food offers, recovery routes, School Points / Café Play and The First Table story world. This opens the separate café dashboard; Journal OS does not transfer profile data or points. Example offers and robot assignments are simulated, and production account access and payments are not open yet.
+
 ## Run it
 
 ```bash

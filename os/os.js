@@ -87,6 +87,7 @@ const ICONS = {
   companion: ['..kk....kk..', '..kck..kck..', '..kck..kck..', '..kck..kck..', '.kkkkkkkkkk.', '.kwwwwwwwwk.', '.kwgkwwkgwk.', '.kwwwwwwwwk.', '.kwwwkkwwwk.', '.kwwwwwwwwk.', '..kkkkkkkk..', '...k....k...'],
   together: ['............', '.kk.kk......', 'kppkppk.....', 'kppppppk.kk.', 'kppppppkkcck', '.kppppkkcccc', '..kppkkcccck', '...kk.kcccck', '.......kcck.', '........kk..', '............', '............'],
   zine: ['kkkkkkkkkk..', 'kwwwwwwwwkk.', 'kwppppwwwkwk', 'kwppppwwwkkk', 'kwwwwwwwwwwk', 'kwkkkkkkkwwk', 'kwwwwwwwwwwk', 'kwkkkkwcccwk', 'kwwwwwwcccwk', 'kwkkkkwcccwk', 'kwwwwwwwwwwk', 'kkkkkkkkkkkk'],
+  cafe: ['.....gg.....', '.....kk.....', '..kkkkkkkk..', '.kwwwwwwwwk.', 'kwwkkkkkkwwk', 'kwkggkkggkwk', 'kwkkkkkkkkwk', '.kwwwwwwwwk.', '..kkkkkkkk..', '...kmmmmk...', '..kkmmmmkk..', '..kk....kk..'],
   school: ['............', '.....kk.....', '...kkcckk...', '.kkccccccck.', 'kccccccccccck'.slice(0, 12), '.kkccccccckk', '...kkcckk.ak', '...kwwwwk..a', '...kwwwwk..a', '....kkkk..aa', '............', '............'],
   studio: ['.........kk.', '........kaak', '.......kaak.', '......kaak..', '.....kaak...', '....kaak....', '...kbbk.....', '..kbbk......', '..kwk.......', '.kkk........', '.k..........', '............'],
   world: ['....kkkk....', '..kkmmcckk..', '.kmmmccccck.', '.kmmcccmmck.', 'kccccccmmmck', 'kcccmmccccck', 'kccmmmmcccck', 'kcccmmccmmck', '.kccccccmmk.', '.kcccccccck.', '..kkcccckk..', '....kkkk....'],
